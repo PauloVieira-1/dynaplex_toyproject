@@ -18,7 +18,7 @@ class State:
     day: int
     pipeline: list[int]
     category: StateCategory = StateCategory.AWAIT_EVENT
-
+    
 
 class PolicyType(Enum):
     BASE_STOCK = auto()
