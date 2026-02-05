@@ -5,13 +5,13 @@ def train_PPO(mdp, number_iterations=50):
     config = PPOTrainerConfig(
         seed = 42,
         device = "cpu",
-        hidden_sizes=[64, 64],
+        hidden_sizes=[128, 128],
         num_steps= 2 * number_iterations,
         minibatch_size=64,
         lr=3e-4,
         total_timesteps=100000, # Total n. interactions across all iterations
         logdir=None,  
-        num_envs=16, # Number of parallel environments for data collection (speeds up training)
+        num_envs=8, # Number of parallel environments for data collection (speeds up training)
     )
 
 

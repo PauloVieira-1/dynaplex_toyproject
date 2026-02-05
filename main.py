@@ -87,7 +87,7 @@ def main() -> None:
     connections = []  # no edges for single node
     state_by_id = {mdp.id: state}
 
-    create_graph_window(nodes, connections, state_by_id)
+    # create_graph_window(nodes, connections, state_by_id)
 
 
 
