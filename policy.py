@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 from dataclasses import dataclass
 from typing import List
 
@@ -10,13 +11,16 @@ from custom_types import State
 class BasePolicy:
     """
     Abstract base class for inventory policies.
+    Matches the DynaPlex policy interface.
     """
     node: Node
 
-    def decide_order_quantity(self, pending_orders: List[int], state: State) -> int:
+    def get_action(self, state: State) -> int:
+        """Determines the action based on the current state."""
         raise NotImplementedError
 
     def set_parameters(self, **kwargs) -> None:
+        """Updates policy hyperparameters."""
         raise NotImplementedError
 
 
@@ -24,7 +28,7 @@ class BasePolicy:
 class BaseStockPolicy(BasePolicy):
     """
     Base-stock policy with safety stock.
-    Orders enough to reach target inventory + safety stock.
+    Orders enough to reach (target + safety) inventory position.
     """
     target_inventory: int = 50
     safety_stock: int = 10
@@ -43,47 +47,42 @@ class BaseStockPolicy(BasePolicy):
         if price_per_unit is not None:
             self.price_per_unit = price_per_unit
 
-    def decide_order_quantity(self, pending_orders: List[int], state: State) -> int:
-        total_pending = sum(pending_orders)
+    def get_action(self, state: State) -> int:
+        # Accessing state.pipeline directly from the state object
+        total_pending = sum(state.pipeline)
+        
+        # Calculate inventory position: On-hand + On-order - Backlog
         inventory_position = state.inventory + total_pending - state.backorders
         base_stock_level = self.target_inventory + self.safety_stock
+        
+        # Order the difference, constrained by physical node capacity
         order_quantity = max(0, base_stock_level - inventory_position)
-        return min(order_quantity, self.node.capacity - state.inventory)
-
+        return int(min(order_quantity, self.node.capacity - state.inventory))
 
 
 @dataclass
 class MinMaxPolicy(BasePolicy):
     """
-    Min-max inventory policy.
-    Orders up to max_inventory when below min_inventory.
+    Min-max inventory policy (s, S policy).
+    Orders up to max_inventory only when below min_inventory.
     """
     min_inventory: int = 20
     max_inventory: int = 80
     price_per_unit: float = 20.0
 
-    def set_parameters(
-        self,
-        min_inventory: int | None = None,
-        max_inventory: int | None = None,
-        price_per_unit: float | None = None,
-    ) -> None:
-        if min_inventory is not None:
-            self.min_inventory = min_inventory
-        if max_inventory is not None:
-            self.max_inventory = max_inventory
-        if price_per_unit is not None:
-            self.price_per_unit = price_per_unit
+    def set_parameters(self, **kwargs) -> None:
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
 
-    def decide_order_quantity(self, pending_orders: List[int], state: State) -> int:
-        total_pending = sum(pending_orders)
+    def get_action(self, state: State) -> int:
+        total_pending = sum(state.pipeline)
         inventory_position = state.inventory + total_pending
 
-        if inventory_position >= self.max_inventory:
-            return 0
         if inventory_position < self.min_inventory:
             order_quantity = self.max_inventory - inventory_position
-            return min(order_quantity, self.node.capacity - state.inventory - total_pending)
+            # Ensure we don't exceed physical node capacity
+            return int(min(order_quantity, self.node.capacity - state.inventory))
         return 0
 
 
@@ -91,22 +90,18 @@ class MinMaxPolicy(BasePolicy):
 class FixedOrderPolicy(BasePolicy):
     """
     Fixed order quantity policy.
-    Always orders a fixed quantity up to available capacity.
+    Always orders a fixed amount if there is capacity.
     """
     order_quantity: int = 30
     price_per_unit: float = 20.0
 
-    def set_parameters(
-        self,
-        order_quantity: int | None = None,
-        price_per_unit: float | None = None,
-    ) -> None:
-        if order_quantity is not None:
-            self.order_quantity = order_quantity
-        if price_per_unit is not None:
-            self.price_per_unit = price_per_unit
+    def set_parameters(self, **kwargs) -> None:
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
 
-    def decide_order_quantity(self, pending_orders: List[int], state: State) -> int:
-        inventory_position = state.inventory + sum(pending_orders)
-        available_capacity = self.node.capacity - inventory_position
-        return min(self.order_quantity, max(0, available_capacity))
+    def get_action(self, state: State) -> int:
+        total_pending = sum(state.pipeline)
+        available_capacity = self.node.capacity - (state.inventory + total_pending)
+        
+        return int(min(self.order_quantity, max(0, available_capacity)))
