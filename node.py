@@ -98,7 +98,7 @@ class Node:
         assert state.remaining_time > 0, "Simulation already finished."
 
         # Receive arrivals from the pipeline (lead time)
-        if state.pipeline:
+        if state.pipeline and self.lead_time > 0:
             arrived = state.pipeline.pop(0)
             state.inventory = min(self.capacity, state.inventory + arrived) # Orders that arrive but exceed capacity are lost
 

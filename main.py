@@ -62,10 +62,11 @@ def main() -> None:
     # Run baseline simulation with the initial policy
     # ------------------------------------------------
 
-    simulate_episode(mdp, policy, seed=42)
 
     context = TrajectoryContext(rng=np.random.default_rng(42))
     state = mdp.get_initial_state(context)
+
+    simulate_episode(mdp, policy, seed=42)
 
     # Initialize PPO Trainer and Train Policy
     # ------------------------------------------------
@@ -78,7 +79,9 @@ def main() -> None:
     # ------------------------------------------------
 
     print("Simulating episode with trained PPO policy...")
-    simulate_episode(mdp, trained_policy, seed=42)
+
+    state = mdp.get_initial_state(context)
+    simulate_episode(mdp, trained_policy, seed=54)
 
     # Generate Visualization
     # ------------------------------------------------
