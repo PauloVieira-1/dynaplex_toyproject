@@ -9,9 +9,6 @@ class StateCategory(Enum):
 
 @dataclass(slots=True)
 class State:
-    """
-    Dynamic state for a single supply-chain node.
-    """
     inventory: int
     backorders: int
     remaining_time: int

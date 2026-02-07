@@ -2,12 +2,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from dataclasses import dataclass
 from dynaplex.modelling import StateCategory, TrajectoryContext
 from node import Node
 from policy import BaseStockPolicy
 from graph import create_graph_window
-
 from PPO import train_PPO
 
 
@@ -17,6 +15,7 @@ def simulate_episode(mdp: Node, policy: BaseStockPolicy, *, seed: int = 42) -> N
     state = mdp.get_initial_state(context)
 
     step = 0
+
     print("=" * 80)
     print("SIMULATION STARTING...")
     print(f"Initial state: {state}")
@@ -61,7 +60,6 @@ def main() -> None:
 
     # Run baseline simulation with the initial policy
     # ------------------------------------------------
-
 
     context = TrajectoryContext(rng=np.random.default_rng(42))
     state = mdp.get_initial_state(context)

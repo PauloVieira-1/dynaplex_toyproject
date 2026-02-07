@@ -51,7 +51,7 @@ class BaseStockPolicy(BasePolicy):
         # Accessing state.pipeline directly from the state object
         total_pending = sum(state.pipeline)
         
-        # Calculate inventory position: On-hand + On-order - Backlog
+        # Calculate inventory position -> On-hand + On-order - Backlog
         inventory_position = state.inventory + total_pending - state.backorders
         base_stock_level = self.target_inventory + self.safety_stock
         
@@ -81,7 +81,6 @@ class MinMaxPolicy(BasePolicy):
 
         if inventory_position < self.min_inventory:
             order_quantity = self.max_inventory - inventory_position
-            # Ensure we don't exceed physical node capacity
             return int(min(order_quantity, self.node.capacity - state.inventory))
         return 0
 

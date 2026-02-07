@@ -14,13 +14,12 @@ from dynaplex.modelling import (
 
 from custom_types import State
 
+
+# A single node in the supply chain, modeled as an MDP. 
+# Based on Airplane in MDP examples from DynaPlex.
 @dataclass(init=False, slots=True)
 class Node:
-    """
-    Single-node inventory MDP with lead times and costs.
-    Actions:
-        0..capacity : order quantity
-    """
+
     # Static configuration
     id: int
     name: str
@@ -33,7 +32,7 @@ class Node:
     upstream_ids: list[int]
     downstream_ids: list[int]
 
-    # DynaPlex-required MDP metadata
+    # MDP metadata
     num_actions: int
     horizon_type: HorizonType
     num_features: int
@@ -68,11 +67,13 @@ class Node:
         self.backlog_cost = backlog_cost
         self.order_cost = order_cost
         self.lead_time = lead_time
-        self.upstream_ids = upstream_ids
-        self.downstream_ids = downstream_ids
+        self.upstream_ids = upstream_ids # Not used now for single node, but will be important for multi-node supply chain
+        self.downstream_ids = downstream_ids  # Not used now for single node, but will be important for multi-node supply chain
         self.initial_horizon = initial_horizon
 
-        self.num_actions = self.capacity + 1
+        # Order quantity can be from 0 to capacity (inclusive). This differs from airplane example (only reject or accept) because we have a range of order quantities.
+        self.num_actions = self.capacity + 1 
+
         self.horizon_type = HorizonType.FINITE
         self.num_features = discover_num_features(self)
 
@@ -81,7 +82,7 @@ class Node:
         Returns a fresh initial state of the node.
         """
         return State(
-            inventory=self.capacity // 2,
+            inventory=self.capacity // 2, # Start with half of capacity as initial inventory (arbitrary choice for now)
             backorders=0,
             remaining_time=self.initial_horizon,
             day=0,
@@ -91,9 +92,12 @@ class Node:
 
     def modify_state_with_event(self, state: State, context: TrajectoryContext) -> None:
         """
-        Process exogenous event: receive arrivals + realize demand.
+        Process exogenous event
+        receive arrivals + realize demand.
         Moves node from AWAIT_EVENT -> AWAIT_ACTION.
         """
+
+        # Sanity checks
         assert state.category == StateCategory.AWAIT_EVENT, "Not expecting an event right now."
         assert state.remaining_time > 0, "Simulation already finished."
 
@@ -103,14 +107,14 @@ class Node:
             state.inventory = min(self.capacity, state.inventory + arrived) # Orders that arrive but exceed capacity are lost
 
         # Demand realization
-        demand = int(context.rng.integers(low=0, high=10))
+        demand = int(context.rng.integers(low=0, high=10)) # Comparable to "price" from dynaplex example
 
         fulfilled = min(demand, state.inventory)
         state.inventory -= fulfilled
         state.backorders += demand - fulfilled
 
         # Holding and backlog costs for the day
-        context.cumulative_cost += self.holding_cost * state.inventory
+        context.cumulative_cost += self.holding_cost * state.inventory # Assumes is the same for each unit in inventory
         context.cumulative_cost += self.backlog_cost * state.backorders
 
         # Advance time
@@ -127,21 +131,22 @@ class Node:
         """
         Apply an action (order quantity).
         Moves node from AWAIT_ACTION -> AWAIT_EVENT or FINAL.
+        This is called after the agent selects an action, and is responsible for updating the state based on that action and applying any costs associated with the action.
         """
         assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action right now."
         assert state.remaining_time > 0, "Simulation already finished."
-        assert 0 <= action < self.num_actions, "Action out of bounds."
+        assert 0 <= action < self.num_actions, "Action out of bounds." 
 
         if action > 0:
             max_order = max(self.capacity - state.inventory, 0)
-            order_qty = min(action, max_order)
+            order_qty = min(action, max_order) # Based on policies (see policy.py), action should never exceed max_order.
             context.cumulative_cost += self.order_cost * order_qty
 
             if self.lead_time <= 0:
                 state.inventory = min(self.capacity, state.inventory + order_qty)
             else:
-                if len(state.pipeline) < self.lead_time:
-                    state.pipeline.extend([0] * (self.lead_time - len(state.pipeline)))
+                if len(state.pipeline) < self.lead_time: # This should never happen because we always append lead_time zeros at the start, but just in case to avoid index errors
+                    state.pipeline.extend([0] * (self.lead_time - len(state.pipeline))) # in case pipeline got shortened for some reason, we want to make sure it always has at least lead_time elements to avoid index errors
                 state.pipeline[-1] += order_qty
 
         if state.remaining_time <= 0:
@@ -149,7 +154,7 @@ class Node:
         else:
             state.category = StateCategory.AWAIT_EVENT
 
-    def write_features(self, state: State, features: Features) -> None:
+    def write_features(self, state: State, features: Features) -> None: # Not used at the moment 
         """
         Write the features of the current state into the provided Features object.
         """
@@ -158,7 +163,7 @@ class Node:
         features.append(state.remaining_time / self.initial_horizon)
         features.append(sum(state.pipeline) / self.capacity)
 
-    def write_action_validity(self, state: State, valid: NDArray) -> None:
+    def write_action_validity(self, state: State, valid: NDArray) -> None: # Not used at the moment 
         """
         Write the validity of actions for the current state into the provided valid array.
         """
