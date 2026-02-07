@@ -44,9 +44,9 @@ def main() -> None:
     
     mdp = Node(
         id=1,
-        name="Plant-1",
+        name="Node_1",
         capacity=20,
-        node_type="Node_1",
+        node_type="Plant",
         holding_cost=1.0,
         backlog_cost=5.0,
         order_cost=2.0,
@@ -88,7 +88,7 @@ def main() -> None:
     connections = []  # no edges for single node
     state_by_id = {mdp.id: state}
 
-    # create_graph_window(nodes, connections, state_by_id)
+    create_graph_window(nodes, connections, state_by_id)
 
 
 
