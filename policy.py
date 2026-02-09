@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import numpy as np
 from dataclasses import dataclass
-from typing import List
 
 from node import Node
-from custom_types import State
+from custom_types import NodeInfo
 
 @dataclass
 class BasePolicy:
@@ -15,7 +14,7 @@ class BasePolicy:
     """
     node: Node
 
-    def get_action(self, state: State) -> int:
+    def get_action(self, state: NodeInfo) -> int:
         """Determines the action based on the current state."""
         raise NotImplementedError
 
@@ -47,17 +46,17 @@ class BaseStockPolicy(BasePolicy):
         if price_per_unit is not None:
             self.price_per_unit = price_per_unit
 
-    def get_action(self, state: State) -> int:
+    def get_action(self, state: NodeInfo) -> int:
         # Accessing state.pipeline directly from the state object
         total_pending = sum(state.pipeline)
         
-        # Calculate inventory position -> On-hand + On-order - Backlog
-        inventory_position = state.inventory + total_pending - state.backorders
+        # Calculate inventory position -> On-hand + On-order - Backlog (inventory_level can be negative for backlog)
+        inventory_position = state.inventory_level + total_pending
         base_stock_level = self.target_inventory + self.safety_stock
         
         # Order the difference, constrained by physical node capacity
         order_quantity = max(0, base_stock_level - inventory_position)
-        return int(min(order_quantity, self.node.capacity - state.inventory))
+        return int(min(order_quantity, self.node.capacity - state.inventory_level))
 
 
 @dataclass
@@ -75,13 +74,13 @@ class MinMaxPolicy(BasePolicy):
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    def get_action(self, state: State) -> int:
+    def get_action(self, state: NodeInfo) -> int:
         total_pending = sum(state.pipeline)
-        inventory_position = state.inventory + total_pending
+        inventory_position = state.inventory_level + total_pending
 
         if inventory_position < self.min_inventory:
             order_quantity = self.max_inventory - inventory_position
-            return int(min(order_quantity, self.node.capacity - state.inventory))
+            return int(min(order_quantity, self.node.capacity - state.inventory_level))
         return 0
 
 
@@ -99,8 +98,8 @@ class FixedOrderPolicy(BasePolicy):
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    def get_action(self, state: State) -> int:
+    def get_action(self, state: NodeInfo) -> int:
         total_pending = sum(state.pipeline)
-        available_capacity = self.node.capacity - (state.inventory + total_pending)
+        available_capacity = self.node.capacity - (state.inventory_level + total_pending)
         
         return int(min(self.order_quantity, max(0, available_capacity)))

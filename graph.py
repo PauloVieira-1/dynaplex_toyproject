@@ -6,7 +6,8 @@ from typing import List, Tuple
 import networkx as nx
 import plotly.graph_objects as go
 
-from node import Node, State
+from node import Node
+from custom_types import NodeInfo
 
 
 def shorten_edge(x0: float, y0: float, x1: float, y1: float, r: float) -> tuple[float, float, float, float]:
@@ -35,7 +36,7 @@ def shorten_edge(x0: float, y0: float, x1: float, y1: float, r: float) -> tuple[
 def create_graph_window(
     nodes: List[Node],
     connections: List[Tuple[Node, Node]],
-    state_by_id: dict[int, State] | None = None,
+    state_by_id: dict[int, NodeInfo] | None = None,
     title: str = "Supply Chain Network",
 ) -> None:
     """

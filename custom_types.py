@@ -1,21 +1,32 @@
 from enum import Enum, auto
 from dataclasses import dataclass
+from typing import List
+from dynaplex.modelling import StateCategory, HorizonType
 
-
-class StateCategory(Enum):
-    AWAIT_EVENT = auto()
-    AWAIT_ACTION = auto()
-    FINAL = auto()
 
 @dataclass(slots=True)
-class State:
-    inventory: int
-    backorders: int
+class NodeInfo:
+    """
+    Dynamic information of a single node.
+    Keeps track of inventory level and pipeline inventory.
+    """
+    inventory_level: int  # positive = inventory, negative = backlog
+    pipeline: List[int]
+
+
+@dataclass(slots=True)
+class SupplyChainState:
+    """
+    Global supply chain state.
+    Contains a list of NodeInfo objects.
+    """
+    node_infos: List[NodeInfo]
     remaining_time: int
     day: int
-    pipeline: list[int]
-    category: StateCategory = StateCategory.AWAIT_EVENT
-    
+    category: StateCategory
+    horizon_type: HorizonType
+    num_actions: int
+
 
 class PolicyType(Enum):
     BASE_STOCK = auto()
