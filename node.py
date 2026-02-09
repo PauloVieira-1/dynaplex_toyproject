@@ -1,8 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-# A single node in the supply chain: static configuration only.
-# Based on Airplane in MDP examples from DynaPlex.
 
 @dataclass(slots=True)
 class Node:
@@ -15,8 +13,11 @@ class Node:
     backlog_cost: float
     order_cost: float
     lead_time: int
+
+    # For multi-node, we can track connections here
+    
     upstream_ids: list[int]
-    downstream_ids: list[int]
+    downstream_ids: list[int] 
 
     def __init__(
         self,
@@ -46,6 +47,6 @@ class Node:
         self.backlog_cost = backlog_cost
         self.order_cost = order_cost
         self.lead_time = lead_time
-        self.upstream_ids = upstream_ids  # For multi-node systems
-        self.downstream_ids = downstream_ids  # For multi-node systems
+        self.upstream_ids = upstream_ids  # For multi-node 
+        self.downstream_ids = downstream_ids  # For multi-node 
 

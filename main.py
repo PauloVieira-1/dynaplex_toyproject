@@ -16,29 +16,40 @@ from numpy.typing import NDArray
 # Supply Chain MDP
 # -----------------
 
-
 @dataclass(slots=True)
 class SupplyChainMDP:
-    NodeInfo: List[Node]
+    nodes: List[Node]
     initial_horizon: int
     horizon_type: HorizonType
     num_features: int
     num_actions: int
 
-    def __init__(self, NodeInfo: List[Node], initial_horizon: int):
-        self.NodeInfo = NodeInfo
+    def __init__(self, nodes: List[Node], initial_horizon: int):
+
+        assert len(nodes) > 0, "Supply chain must have at least one node."
+        assert initial_horizon > 0, "Initial horizon must be positive."
+        assert all(node.capacity > 0 for node in nodes), "All nodes must have positive capacity."
+        assert all(node.holding_cost >= 0 for node in nodes), "All nodes must have non-negative holding cost."
+        assert all(node.backlog_cost >= 0 for node in nodes), "All nodes must have non-negative backlog cost."
+        assert all(node.order_cost >= 0 for node in nodes), "All nodes must have non-negative order cost."
+        assert all(node.lead_time >= 0 for node in nodes), "All nodes must have non-negative lead time."
+
+        self.nodes = nodes
         self.initial_horizon = initial_horizon
         self.horizon_type = HorizonType.FINITE
+
         # The agent chooses an order quantity between 0 and max capacity
-        self.num_actions = max(node.capacity for node in NodeInfo) + 1
-        
-        # Discover features by probing the state
-        context = TrajectoryContext(rng=np.random.default_rng(0))
+        self.num_actions = max(node.capacity for node in nodes) + 1
         self.num_features = discover_num_features(self)
 
+
+
+
     def get_initial_state(self, context: TrajectoryContext) -> SupplyChainState:
+        
         node_infos = []
-        for node in self.NodeInfo:
+        
+        for node in self.nodes:
             node_infos.append(
                 NodeInfo(
                     inventory_level=node.capacity // 2,
@@ -57,7 +68,7 @@ class SupplyChainMDP:
 
     def modify_state_with_event(self, state: SupplyChainState, context: TrajectoryContext) -> None:
         """
-        Process exogenous event
+        Process exogenous events.
         receive arrivals + realize demand.
         Moves state from AWAIT_EVENT -> AWAIT_ACTION.
         """
@@ -66,7 +77,7 @@ class SupplyChainMDP:
         assert state.category == StateCategory.AWAIT_EVENT, "Not expecting an event right now."
         assert state.remaining_time > 0, "Simulation already finished."
 
-        for node, node_info in zip(self.NodeInfo, state.node_infos):
+        for node, node_info in zip(self.nodes, state.node_infos): # Iterate through nodes to process events
 
             # Calculate inventory and backorders based on inventory_level
             inventory: int = max(0, node_info.inventory_level)
@@ -106,21 +117,24 @@ class SupplyChainMDP:
         else:
             state.category = StateCategory.AWAIT_ACTION
 
-    # -------------------------------------------------------------------------
-    # ACTION TRANSITION
-    # -------------------------------------------------------------------------
 
-    def modify_state_with_action(self, state: SupplyChainState, context: TrajectoryContext, actions: List[int]) -> None:
+
+    def modify_state_with_action(self, state: SupplyChainState, context: TrajectoryContext, action: int) -> None:
         """
         Apply actions (order quantities).
         Moves state from AWAIT_ACTION -> AWAIT_EVENT or FINAL.
         """
 
-        assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action right now."
+        assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action."
         assert state.remaining_time > 0, "Simulation already finished."
-        assert len(actions) == len(self.NodeInfo), "Action dimension mismatch."
 
-        for node, node_info, action in zip(self.NodeInfo, state.node_infos, actions):
+
+        for node, node_info in zip(self.nodes, state.node_infos):
+
+            # print(f"Processing action for node {node.name}: order {action} units!!!!")
+            # print(f"{node_info}!")
+            # print(f"{action}!!!")
+            # print(f'{list(zip(self.nodes, state.node_infos, actions))}')
 
             # Calculate inventory and backorders
             backorders: int = max(0, -node_info.inventory_level)
@@ -155,17 +169,14 @@ class SupplyChainMDP:
     # ---------------------------------------------------------
 
     def write_features(self, state: SupplyChainState, features: Features) -> None:
-            """
-            DynaPlex calls this with (state, features). 
-            We must extract node info from the state ourselves.
-            """
+            
             # Iterate through nodes to extract data from the state
-            for node_static, node_dynamic in zip(self.NodeInfo, state.node_infos):
+            for node_static, node_dynamic in zip(self.nodes, state.node_infos):
+
                 inventory = max(0, node_dynamic.inventory_level)
                 backlog = max(0, -node_dynamic.inventory_level)
                 
-                # Use append to add to the feature vector
-                features.append(inventory / node_static.capacity)
+                features.append(inventory / node_static.capacity) # Normalize inventory by capacity
                 features.append(backlog / node_static.capacity)
                 features.append(sum(node_dynamic.pipeline) / node_static.capacity)
                 
@@ -174,22 +185,13 @@ class SupplyChainMDP:
 
 
     def write_action_validity(self, state: SupplyChainState, valid: NDArray[np.bool_]) -> None:
-            """
-            DynaPlex calls this with (state, valid).
-            'valid' is a boolean array of size self.num_actions.
-            """
-            # 1. Get the static config and dynamic state for the node
-            # (Assuming single-node for now based on your main script)
-            node_static = self.NodeInfo[0]
+
+            node_static = self.nodes[0]
             node_dynamic = state.node_infos[0]
 
-            # 2. Determine physical constraints
-            # Example: can't order more than (Capacity - Current Inventory)
             current_inv = max(0, node_dynamic.inventory_level)
             max_order = max(0, node_static.capacity - current_inv)
 
-            # 3. Populate the 'valid' mask
-            # Note: action index corresponds to order quantity
             for action_qty in range(self.num_actions):
                 valid[action_qty] = (action_qty <= max_order)
 
@@ -217,13 +219,12 @@ def simulate_episode(mdp: SupplyChainMDP, policy: BaseStockPolicy, *, seed: int 
 
         elif state.category == StateCategory.AWAIT_ACTION:
             
-            # Only one node for now
-            node_info = state.node_infos[0]
-            action = policy.get_action(state=node_info)
+            action = policy.get_action(state)
 
-            mdp.modify_state_with_action(state, context, [action])
+            mdp.modify_state_with_action(state, context, action)
 
-            print(f"Step {step}: ACTION {action} -> State after action: {state}")
+            print(f"\nStep {step}: ACTION {action}")
+            print(f"  State after action: {state}\n")
             step += 1
 
         else:
@@ -255,7 +256,7 @@ def main() -> None:
     )
 
     mdp = SupplyChainMDP(
-        NodeInfo=[node],   
+        nodes=[node],   
         initial_horizon=15,
     )
 
@@ -283,7 +284,7 @@ def main() -> None:
 
     # final_state = mdp.get_initial_state(TrajectoryContext(rng=np.random.default_rng(1)))
 
-    # nodes = mdp.NodeInfo
+    # nodes = mdp.nodes
     # connections = []  # no edges for single node
     # state_by_id = {node.id: node_info for node, node_info in zip(nodes, final_state.node_infos)}
 
