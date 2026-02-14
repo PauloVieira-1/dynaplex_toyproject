@@ -77,7 +77,6 @@ def train_PPO(mdp, number_iterations=50):
         num_envs=8, # Number of parallel environments for data collection (speeds up training)
     )
 
-    
 
 
     print(f"Training PPO with config: {config}")
