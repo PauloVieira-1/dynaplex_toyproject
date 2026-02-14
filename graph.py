@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Dict
 
 import networkx as nx
 import plotly.graph_objects as go
@@ -10,14 +10,14 @@ from node import Node
 from custom_types import NodeInfo
 
 
-def shorten_edge(x0: float, y0: float, x1: float, y1: float, r: float) -> tuple[float, float, float, float]:
+def shorten_edge(x0: float, y0: float, x1: float, y1: float, r: float) -> Tuple[float, float, float, float]:
     """
     Shorten a line so it starts/ends at the circle boundary.
     r = node radius (same for all nodes)
     """
     dx = x1 - x0
     dy = y1 - y0
-    dist = math.sqrt(dx * dx + dy * dy)
+    dist = math.hypot(dx, dy)
 
     if dist == 0:
         return x0, y0, x1, y1
@@ -36,7 +36,7 @@ def shorten_edge(x0: float, y0: float, x1: float, y1: float, r: float) -> tuple[
 def create_graph_window(
     nodes: List[Node],
     connections: List[Tuple[Node, Node]],
-    state_by_id: dict[int, NodeInfo] | None = None,
+    state_by_id: Optional[Dict[int, NodeInfo]] = None,
     title: str = "Supply Chain Network",
 ) -> None:
     """
@@ -44,7 +44,6 @@ def create_graph_window(
     Nodes = Node objects, dynamic values come from state_by_id.
     """
     node_radius = 0.06
-
     graph = nx.DiGraph()
 
     # Add nodes with metadata
@@ -53,9 +52,9 @@ def create_graph_window(
         graph.add_node(
             node.id,
             label=node.name,
-            inventory=st.inventory if st else 0,
-            backorders=st.backorders if st else 0,
-            remaining_time=st.remaining_time if st else 0,
+            inventory=getattr(st, "inventory", 0),
+            backorders=getattr(st, "backorders", 0),
+            remaining_time=getattr(st, "remaining_time", 0),
         )
 
     # Add directed edges
@@ -66,8 +65,8 @@ def create_graph_window(
     pos = nx.spring_layout(graph, seed=42)
 
     # Build edge traces
-    edge_x: list[float | None] = []
-    edge_y: list[float | None] = []
+    edge_x: List[Optional[float]] = []
+    edge_y: List[Optional[float]] = []
 
     for u, v in graph.edges():
         x0, y0 = pos[u]
@@ -85,10 +84,10 @@ def create_graph_window(
     )
 
     # Build node traces (on top)
-    node_x: list[float] = []
-    node_y: list[float] = []
-    hover_text: list[str] = []
-    labels: list[str] = []
+    node_x: List[float] = []
+    node_y: List[float] = []
+    hover_text: List[str] = []
+    labels: List[str] = []
 
     for node_id in graph.nodes():
         x, y = pos[node_id]

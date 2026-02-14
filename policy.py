@@ -50,13 +50,12 @@ class BaseStockPolicy(BasePolicy):
         if price_per_unit is not None:
             self.price_per_unit = price_per_unit
 
-    def get_action(self, state: SupplyChainState) -> int:
-        node_info = state.node_infos[0] # Assuming single-node for now, so we take the first node's info.
+    def get_action(self, node_info) -> int:
 
         total_pending = sum(node_info.pipeline)
 
         # Inventory position = on-hand - backlog + on-order
-        inventory_position = node_info.inventory_level + total_pending
+        inventory_position = node_info.inventory_level + total_pending - max(0, node_info.inventory_level)  # Backlog is negative inventory, so subtract it out
         base_stock_level = self.target_inventory + self.safety_stock
 
         order_quantity = max(0, base_stock_level - inventory_position)
@@ -86,8 +85,7 @@ class MinMaxPolicy(BasePolicy):
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    def get_action(self, state: SupplyChainState) -> int:
-        node_info = state.node_infos[0]
+    def get_action(self, node_info) -> int:
 
         total_pending = sum(node_info.pipeline)
         inventory_position = node_info.inventory_level + total_pending
@@ -120,8 +118,7 @@ class FixedOrderPolicy(BasePolicy):
             if hasattr(self, key):
                 setattr(self, key, value)
 
-    def get_action(self, state: SupplyChainState) -> int:
-        node_info = state.node_infos[0]
+    def get_action(self, node_info) -> int:
         available_capacity = self.node.capacity - max(0, node_info.inventory_level)
 
         return int(min(self.order_quantity, max(0, available_capacity)))

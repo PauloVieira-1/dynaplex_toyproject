@@ -7,9 +7,9 @@ import numpy as np
 
 from dynaplex.modelling import StateCategory, TrajectoryContext, HorizonType, discover_num_features, Features
 from node import Node
-from policy import BaseStockPolicy
+from policy import BasePolicy, BaseStockPolicy
 from graph import create_graph_window
-from PPO import train_PPO
+from PPO import decode_action, encode_action, train_PPO
 from numpy.typing import NDArray
 
 
@@ -23,6 +23,7 @@ class SupplyChainMDP:
     horizon_type: HorizonType
     num_features: int
     num_actions: int
+    action_dims: List[int]
 
     def __init__(self, nodes: List[Node], initial_horizon: int):
 
@@ -38,8 +39,9 @@ class SupplyChainMDP:
         self.initial_horizon = initial_horizon
         self.horizon_type = HorizonType.FINITE
 
-        # The agent chooses an order quantity between 0 and max capacity
-        self.num_actions = max(node.capacity for node in nodes) + 1
+        self.action_dims = [node.capacity + 1 for node in nodes] # Each node can order from 0 up to its capacity, inclusive
+        self.num_actions = np.prod(self.action_dims)
+
         self.num_features = discover_num_features(self)
 
 
@@ -129,7 +131,10 @@ class SupplyChainMDP:
         assert state.remaining_time > 0, "Simulation already finished."
 
 
-        for node, node_info in zip(self.nodes, state.node_infos):
+        action_list = decode_action(action, self.action_dims)
+
+
+        for node, node_info, action_qty in zip(self.nodes, state.node_infos, action_list): # Iterate through nodes to process actions
 
             # print(f"Processing action for node {node.name}: order {action} units!!!!")
             # print(f"{node_info}!")
@@ -140,9 +145,9 @@ class SupplyChainMDP:
             backorders: int = max(0, -node_info.inventory_level)
             inventory: int = max(0, node_info.inventory_level)
 
-            if action > 0:
+            if action_qty > 0:
                 max_order = max(node.capacity - inventory, 0)
-                order_qty = min(action, max_order)
+                order_qty = min(action_qty, max_order)
 
                 context.cumulative_cost += node.order_cost * order_qty
 
@@ -164,10 +169,6 @@ class SupplyChainMDP:
             state.category = StateCategory.AWAIT_EVENT
 
 
-    # ---------------------------------------------------------
-    # FEATURES & ACTION VALIDITY
-    # ---------------------------------------------------------
-
     def write_features(self, state: SupplyChainState, features: Features) -> None:
             
             # Iterate through nodes to extract data from the state
@@ -180,14 +181,12 @@ class SupplyChainMDP:
                 features.append(backlog / node_static.capacity)
                 features.append(sum(node_dynamic.pipeline) / node_static.capacity)
                 
-            # Optional: add global features like remaining time
             features.append(state.remaining_time / self.initial_horizon)
 
 
     def write_action_validity(self, state: SupplyChainState, valid: NDArray[np.bool_]) -> None:
 
-            node_static = self.nodes[0]
-            node_dynamic = state.node_infos[0]
+        for node_static, node_dynamic in zip(self.nodes, state.node_infos):
 
             current_inv = max(0, node_dynamic.inventory_level)
             max_order = max(0, node_static.capacity - current_inv)
@@ -199,7 +198,7 @@ class SupplyChainMDP:
 # Simulation
 # ------------
 
-def simulate_episode(mdp: SupplyChainMDP, policy: BaseStockPolicy, *, seed: int = 42) -> None:
+def simulate_episode(mdp: SupplyChainMDP, policy: List[BasePolicy], *, seed: int = 42) -> None:
 
     context = TrajectoryContext(rng=np.random.default_rng(seed))
     state = mdp.get_initial_state(context)
@@ -218,12 +217,18 @@ def simulate_episode(mdp: SupplyChainMDP, policy: BaseStockPolicy, *, seed: int 
             print(f"  State after event: {state}")
 
         elif state.category == StateCategory.AWAIT_ACTION:
+
+            flat_action = None
             
-            action = policy.get_action(state)
+            if isinstance(policy, list):
+                actions_list = [p.get_action(ni) for p, ni in zip(policy, state.node_infos)]
+                flat_action = encode_action(actions_list, mdp.action_dims)
+            else:
+                flat_action = policy.get_action(state)       
 
-            mdp.modify_state_with_action(state, context, action)
+            mdp.modify_state_with_action(state, context, flat_action)
 
-            print(f"\nStep {step}: ACTION {action}")
+            print(f"  Action taken: {flat_action})")
             print(f"  State after action: {state}\n")
             step += 1
 
@@ -242,7 +247,7 @@ def main() -> None:
     # Initialize MDP and Policy
     # -----------------------
 
-    node = Node(
+    node_1 = Node(
         id=1,
         name="Node_1",
         capacity=20,
@@ -255,17 +260,66 @@ def main() -> None:
         downstream_ids=[],
     )
 
+    policy_node_1 = BaseStockPolicy(node=node_1, target_inventory=10, safety_stock=5, price_per_unit=20.0)
+
+    node_2 = Node(
+        id=2,
+        name="Node_2",
+        capacity=15,
+        node_type="Warehouse",
+        holding_cost=0.5,
+        backlog_cost=3.0,
+        order_cost=1.5,
+        lead_time=1,
+        upstream_ids=[1],
+        downstream_ids=[],
+    )
+
+    policy_node_2 = BaseStockPolicy(node=node_2, target_inventory=8, safety_stock=3, price_per_unit=20.0)
+
+    node_3 = Node(
+        id=3,
+        name="Node_3",
+        capacity=10,
+        node_type="Retailer",
+        holding_cost=0.2,
+        backlog_cost=10.0,
+        order_cost=1.0,
+        lead_time=0,
+        upstream_ids=[2],
+        downstream_ids=[],
+    )
+
+    policy_node_3 = BaseStockPolicy(node=node_3, target_inventory=5, safety_stock=2, price_per_unit=20.0)
+
     mdp = SupplyChainMDP(
-        nodes=[node],   
+        nodes=[node_1, node_2, node_3],   
         initial_horizon=15,
     )
 
-    policy = BaseStockPolicy(node=node, target_inventory=15, safety_stock=5, price_per_unit=25.0)
+
+    # Generate Visualization
+    # ------------------------------------------------
+
+    state = mdp.get_initial_state(TrajectoryContext(rng=np.random.default_rng(1)))
+
+    nodes = mdp.nodes
+
+    connections = []
+    for node in nodes:
+        for upstream_id in node.upstream_ids:
+            connections.append((next(n for n in nodes if n.id == upstream_id), node))
+
+    state_by_id = {node.id: node_info for node, node_info in zip(nodes, state.node_infos)}
+    create_graph_window(nodes, connections, state_by_id)
+
 
     # Run baseline simulation with the initial policy
     # ------------------------------------------------
 
-    simulate_episode(mdp, policy, seed=42)
+    policy_list = [policy_node_1, policy_node_2, policy_node_3]
+
+    simulate_episode(mdp, policy_list, seed=42)
 
     # Initialize PPO Trainer and Train Policy
     # ------------------------------------------------
@@ -278,17 +332,6 @@ def main() -> None:
 
     print("Simulating episode with trained PPO policy...")
     simulate_episode(mdp, trained_policy, seed=54)
-
-    # Generate Visualization
-    # ------------------------------------------------
-
-    # final_state = mdp.get_initial_state(TrajectoryContext(rng=np.random.default_rng(1)))
-
-    # nodes = mdp.nodes
-    # connections = []  # no edges for single node
-    # state_by_id = {node.id: node_info for node, node_info in zip(nodes, final_state.node_infos)}
-
-    # create_graph_window(nodes, connections, state_by_id)
 
 
 if __name__ == "__main__":
