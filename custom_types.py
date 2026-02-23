@@ -1,7 +1,7 @@
 from enum import Enum, auto
 from dataclasses import dataclass
 from typing import List
-from dynaplex.modelling import StateCategory, HorizonType
+from dynaplex.modelling import StateCategory
 
 
 @dataclass(slots=True)
@@ -16,8 +16,16 @@ class SupplyChainState:
     remaining_time: int
     day: int
     category: StateCategory
-    horizon_type: HorizonType
-    num_actions: int
+    current_node_index: int
+
+    # For multi-node I found no other way of 
+    # tracking pending orders than to add it to the state
+
+    # Is it neccesary to have pending orders in the state? 
+    # I think so, because the policy needs to know how many units are pending in the pipeline. 
+    # The inventory position is calculated as on-hand inventory + pending orders - backlog
+
+    pending_orders: List[int] 
 
 
 class PolicyType(Enum):
