@@ -7,14 +7,8 @@ from node import Node
 from custom_types import SupplyChainState
 
 
-# Base Policy Interface
-# =======================
-
 @dataclass
 class BasePolicy:
-    """
-    Abstract base class for inventory policies.
-    """
     node: Node
 
     def get_action(self, state: SupplyChainState) -> int:

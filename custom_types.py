@@ -12,17 +12,16 @@ class NodeInfo:
 
 @dataclass(slots=True)
 class SupplyChainState:
+    
     node_infos: List[NodeInfo]
     remaining_time: int
     day: int
     category: StateCategory
     current_node_index: int
 
-    # For multi-node I found no other way of 
-    # tracking pending orders than to add it to the state
+    # For multi-node I found no other way of tracking pending orders than to add it to the state
 
-    # Is it neccesary to have pending orders in the state? 
-    # I think so, because the policy needs to know how many units are pending in the pipeline. 
+    # Is it neccesary to have pending orders in the state in this way? This list can grow large with a high number of nodes I think.
     # The inventory position is calculated as on-hand inventory + pending orders - backlog
 
     pending_orders: List[int] 

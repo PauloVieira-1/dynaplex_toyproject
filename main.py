@@ -30,6 +30,10 @@ class SupplyChainMDP:
 
     def __init__(self, nodes: List[Node], initial_horizon: int):
 
+
+        # Maybe abstract this functionality into a function
+        # ---------------------------------------------------------------------------------------------
+
         assert len(nodes) > 0, "Supply chain must have at least one node."
         assert initial_horizon > 0, "Initial horizon must be positive."
         assert all(node.capacity > 0 for node in nodes), "All nodes must have positive capacity."
@@ -38,9 +42,12 @@ class SupplyChainMDP:
         assert all(node.order_cost >= 0 for node in nodes), "All nodes must have non-negative order cost."
         assert all(node.lead_time >= 0 for node in nodes), "All nodes must have non-negative lead time."
 
+        # ---------------------------------------------------------------------------------------------
+
+
         self.nodes = nodes
         self.initial_horizon = initial_horizon
-        self.horizon_type = HorizonType.FINITE
+        self.horizon_type = HorizonType.FINITE # should work on making finite 
 
 
         self.action_dims = [node.capacity + 1 for node in nodes] # Each node can order from 0 up to its capacity
@@ -60,7 +67,7 @@ class SupplyChainMDP:
         for node in self.nodes:
             node_infos.append(
                 NodeInfo(
-                    inventory_level=node.capacity // 2,
+                    inventory_level=node.capacity // 2, # initially half full
                     pipeline=[0 for _ in range(node.lead_time)],
                 )
             )
@@ -85,10 +92,13 @@ class SupplyChainMDP:
 
     # 1) Process demand at the last node
         process_demand(self, state, context, inventories, backorders_list)
+
     # 2) Fulfill upstream orders
         fulfill_upstream_orders(self, state, inventories)
+
     # 3) Update node infos and compute costs
         update_node_infos_and_costs(self, state, context, inventories, backorders_list)
+
     # Check state validity after all updates
         assert_state_valid(self, state)
 
@@ -96,14 +106,17 @@ class SupplyChainMDP:
         # --------------------------------------------------------------------
         # Reset to first node for next day (should be infinite, rather than finite system??)
         # This happens once only after all nodes have processed daily events 
+
         state.current_node_index = 0
         state.day += 1
         state.remaining_time -= 1
+
         # --------------------------------------------------------------------
 
 
         if state.remaining_time <= 0:
             state.category = StateCategory.FINAL
+
         else:
             state.category = StateCategory.AWAIT_ACTION
 
@@ -112,8 +125,10 @@ class SupplyChainMDP:
     def modify_state_with_action(self, state: SupplyChainState, context: TrajectoryContext, action: int) -> None:
         
 
-        assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action."
-        assert state.remaining_time > 0, "Simulation already finished."
+        # assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action."
+        # assert state.remaining_time > 0, "Simulation finished."
+
+        # ---------------------------------------------------------------------------------------------------
 
         # Before, there I encoded the single integer action into a list of order quantities for each node. 
         # Now, since we consdier the system sequentially and each node makes its decision one at a time, 
@@ -121,14 +136,17 @@ class SupplyChainMDP:
 
         # action_list = decode_action(action, self.action_dims)
 
+        # ---------------------------------------------------------------------------------------------------
+
+
         current_node_info: NodeInfo = state.node_infos[state.current_node_index]
         current_node: Node = self.nodes[state.current_node_index]
 
-        # Calculate inventory and backorders
-        backorders: int = max(0, -current_node_info.inventory_level)
+        # backorders: int = max(0, -current_node_info.inventory_level) 
         inventory: int = max(0, current_node_info.inventory_level)
 
         if action > 0:
+
             max_order = max(current_node.capacity - inventory, 0)
             order_qty = min(action, max_order)
 
@@ -137,8 +155,9 @@ class SupplyChainMDP:
             # Orders always represent a request to upstream now 
             # In past implementation, if the node had no upstream, the system structure was ignored 
 
-            if len(current_node.upstream_ids) > 0:
-                upstream_node_index = current_node.upstream_ids[0] - 1 # Assuming single upstream (will chnage later for multiple upstreams)
+            if len(current_node.upstream_ids) > 0: # To distinguish between first node and rest
+
+                upstream_node_index = current_node.upstream_ids[0] - 1 # Assuming single upstream (will chnage later for multiple)
                 state.pending_orders[upstream_node_index] += order_qty 
 
                 # print(f"{upstream_node_index}, {state.pending_orders}")
@@ -146,45 +165,42 @@ class SupplyChainMDP:
             else:
 
                 if current_node.lead_time > 0:
+
+                    # Always go into pipeline (including source node)
                     if len(current_node_info.pipeline) < current_node.lead_time:
-                        # Pipeline is a list where each element represents the quantity of orders arriving at the end of that day.
-                        current_node_info.pipeline.extend([0] * (current_node.lead_time - len(current_node_info.pipeline))) # Ensure pipeline list is long enough
+                        current_node_info.pipeline.extend(
+                            [0] * (current_node.lead_time - len(current_node_info.pipeline))
+                        )
+                        current_node_info.inventory_level = min(current_node.capacity, current_node_info.inventory_level + order_qty)               
+                    else:
 
-                    current_node_info.pipeline[-1] += order_qty # Order will arrive after lead_time number of days
-
-                else:
-
-                    inventory += order_qty
-                    fulfilled_backlog = min(inventory, backorders)
-
-                    inventory -= fulfilled_backlog
-                    backorders -= fulfilled_backlog
-
-                    current_node_info.inventory_level = inventory - backorders
+                        # Immediate arrival (even for source)
+                        current_node_info.inventory_level += order_qty
 
 
 
         # Transition logic might be incorrect? 
         # Should be checked 
         # --------------------------------------------------------------------
+
         if state.current_node_index < len(self.nodes) - 1:
             state.current_node_index += 1
             state.category = StateCategory.AWAIT_ACTION
             # print(f"Moving to node {state.current_node_index}.....") 
         else:
             state.category = StateCategory.AWAIT_EVENT
+            
         # --------------------------------------------------------------------
 
 
     def write_features(self, state: SupplyChainState, features: Features) -> None:
 
-        # Iterate through nodes to extract data from the state
         for node_static, node_dynamic in zip(self.nodes, state.node_infos):
 
             inventory = max(0, node_dynamic.inventory_level)
             backlog = max(0, -node_dynamic.inventory_level)
             
-            features.append(inventory / node_static.capacity) # Normalize inventory by capacity
+            features.append(inventory / node_static.capacity)
             features.append(backlog / node_static.capacity)
             features.append(sum(node_dynamic.pipeline) / node_static.capacity)
             
@@ -231,7 +247,7 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42) -> None:
             
             mdp.modify_state_with_event(state, context)
             
-            print(f"  Post-Event State: {state}")
+            print(f"    Post-Event State: {state}")
 
         elif state.category == StateCategory.AWAIT_ACTION:
             current_node_idx = state.current_node_index
@@ -254,7 +270,7 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42) -> None:
 
             # ------------------------------------------------------------------------
 
-            print(f"  Decision for {current_node_name} (Index {current_node_idx}): Order {action}")
+            print(f"         Decision for {current_node_name} (Index {current_node_idx}): Order {action}")
 
             mdp.modify_state_with_action(state, context, action)
 
@@ -275,7 +291,6 @@ def main() -> None:
         id=1,
         name="Node_1",
         capacity=20,
-        node_type="Plant",
         holding_cost=1.0,
         backlog_cost=5.0,
         order_cost=2.0,
@@ -290,7 +305,6 @@ def main() -> None:
         id=2,
         name="Node_2",
         capacity=15,
-        node_type="Warehouse",
         holding_cost=0.5,
         backlog_cost=3.0,
         order_cost=1.5,
@@ -305,7 +319,6 @@ def main() -> None:
         id=3,
         name="Node_3",
         capacity=10,
-        node_type="Retailer",
         holding_cost=0.2,
         backlog_cost=10.0,
         order_cost=1.0,
@@ -325,17 +338,20 @@ def main() -> None:
     # Generate Visualization
     # ------------------------------------------------
 
-    state = mdp.get_initial_state(TrajectoryContext(rng=np.random.default_rng(1)))
 
-    nodes = mdp.nodes
+    # state = mdp.get_initial_state(TrajectoryContext(rng=np.random.default_rng(1)))
 
-    connections = []
-    for node in nodes:
-        for upstream_id in node.upstream_ids:
-            connections.append((next(n for n in nodes if n.id == upstream_id), node))
+    # nodes = mdp.nodes
 
-    state_by_id = {node.id: node_info for node, node_info in zip(nodes, state.node_infos)}
-    # create_graph_window(nodes, connections, state_by_id)
+    # connections = []
+    # for node in nodes:
+    #     for upstream_id in node.upstream_ids:
+    #         connections.append((next(n for n in nodes if n.id == upstream_id), node))
+
+    # state_by_id = {node.id: node_info for node, node_info in zip(nodes, state.node_infos)}
+    # # create_graph_window(nodes, connections, state_by_id)
+
+
 
 
     # Run baseline simulation with the initial policy
