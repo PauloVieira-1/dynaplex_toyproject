@@ -5,8 +5,8 @@ from dynaplex.modelling import TrajectoryContext, StateCategory
 
 
 # This is a work in progress 
-# I am thinking of abstracting some of the validation and sanity check logic here
-# --------------------------------------------------------------------------------------------------------
+# I am thinking of abstracting some of the other validation and sanity check logic here or into something similaar
+# -----------------------------------------------------------------------------------------------------------------
 
 def assert_state_valid(mdp, state: SupplyChainState):
 
@@ -14,7 +14,7 @@ def assert_state_valid(mdp, state: SupplyChainState):
     assert state.remaining_time > 0, "Simulation already finished."
     assert len(state.node_infos) == len(mdp.nodes), "State node infos length mismatch with number of nodes."
 
-# --------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------
 
 
 
@@ -54,9 +54,11 @@ def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext,
                    inventories: List[int], backorders_list: List[int]) -> None:
 
 
-    last_node_index = len(mdp.nodes) - 1 #!!! demand is only generated at last node!!!
+    last_node_index = len(mdp.nodes) - 1 #!!! demand is only generated at last node !!!
 
-    demand = context.rng.poisson(lam=5)  #! Example demand distribution for now (to be chnaged)
+    #! Example demand distribution for now (to be chnaged later) 
+    # ASML has a pyramid like structure, should be put in a function at later stage 
+    demand = context.rng.poisson(lam=5)  
 
     inventory = inventories[last_node_index]
     backorders = backorders_list[last_node_index]

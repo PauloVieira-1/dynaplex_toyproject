@@ -31,7 +31,7 @@ class SupplyChainMDP:
     def __init__(self, nodes: List[Node], initial_horizon: int):
 
 
-        # Maybe abstract this functionality into a function
+        # Maybe abstract this into a function latwer
         # ---------------------------------------------------------------------------------------------
 
         assert len(nodes) > 0, "Supply chain must have at least one node."
@@ -53,7 +53,7 @@ class SupplyChainMDP:
         self.action_dims = [node.capacity + 1 for node in nodes] # Each node can order from 0 up to its capacity
 
         # Max possible actions for any single node. 
-        # Maximum because the PPO output layer needs to accommodate the largest action space among the nodes, even if some nodes have smaller action spaces.
+        # Maximum because the PPO output layer needs to accommodate the largest action space among the nodes, even if some nodes have smaller action spaces
         self.num_actions = max(node.capacity for node in nodes) + 1 
 
         self.num_features = discover_num_features(self)
@@ -76,7 +76,7 @@ class SupplyChainMDP:
             node_infos=node_infos,
             remaining_time=self.initial_horizon,
             day=0,
-            category=StateCategory.AWAIT_ACTION,
+            category=StateCategory.AWAIT_ACTION, 
             current_node_index=0,
             pending_orders=[0 for x in self.nodes],
         )
@@ -84,8 +84,8 @@ class SupplyChainMDP:
 
     def modify_state_with_event(self, state: SupplyChainState, context: TrajectoryContext) -> None:
 
-        # I decided to abstract each "step" to a functions in helper_functions.py because this function grew far too big 
-        # Considering doing the same for modify_state_with_action
+        # I decided to abstract each "step" into a functions in helper_functions.py because modify_state_with_event grew far too big 
+        # I will possibly be doing the same for modify_state_with_action
 
 
         inventories, backorders_list = process_inventory_and_pipeline(self, state)
@@ -103,15 +103,17 @@ class SupplyChainMDP:
         assert_state_valid(self, state)
 
 
-        # --------------------------------------------------------------------
-        # Reset to first node for next day (should be infinite, rather than finite system??)
+        # ----------------------------------------------------------------------------------------
+        # Reset to first node for next day 
         # This happens once only after all nodes have processed daily events 
+
+        # I am not sure how something like this would work in an infinite system 
 
         state.current_node_index = 0
         state.day += 1
         state.remaining_time -= 1
 
-        # --------------------------------------------------------------------
+        # -----------------------------------------------------------------------------------------------
 
 
         if state.remaining_time <= 0:
@@ -130,7 +132,7 @@ class SupplyChainMDP:
 
         # ---------------------------------------------------------------------------------------------------
 
-        # Before, there I encoded the single integer action into a list of order quantities for each node. 
+        # Before, I encoded the single integer action into a list of order quantities for each node. 
         # Now, since we consdier the system sequentially and each node makes its decision one at a time, 
         # we can directly use the action as the order quantity for the current node without encoding/decoding.
 
@@ -155,7 +157,7 @@ class SupplyChainMDP:
             # Orders always represent a request to upstream now 
             # In past implementation, if the node had no upstream, the system structure was ignored 
 
-            if len(current_node.upstream_ids) > 0: # To distinguish between first node and rest
+            if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest
 
                 upstream_node_index = current_node.upstream_ids[0] - 1 # Assuming single upstream (will chnage later for multiple)
                 state.pending_orders[upstream_node_index] += order_qty 
@@ -184,9 +186,12 @@ class SupplyChainMDP:
         # --------------------------------------------------------------------
 
         if state.current_node_index < len(self.nodes) - 1:
+
             state.current_node_index += 1
             state.category = StateCategory.AWAIT_ACTION
+
             # print(f"Moving to node {state.current_node_index}.....") 
+
         else:
             state.category = StateCategory.AWAIT_EVENT
             
@@ -253,9 +258,9 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42) -> None:
             current_node_idx = state.current_node_index
             current_node_name = mdp.nodes[current_node_idx].name
             
-            # Temporary solution (currently each node starts with its own policy, 
-            # but maybe it is better to have all nodes share a single policy at start too???
-            # In this scenary Lists would be used for values like target inventory and safety stock, rather than having a policy instance for each node.?
+            # Temporary solution belown (currently each node starts with its own policy, 
+            # but maybe it is better to have all nodes share a single policy at start too???)
+            # In this scenario lists or dictionaries would be used for values like target inventory and safety stock, rather than having a policy instance for each node?
 
             # ------------------------------------------------------------------------
 
