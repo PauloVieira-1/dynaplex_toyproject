@@ -79,6 +79,7 @@ def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext,
 def fulfill_upstream_orders(mdp, state: SupplyChainState, inventories: List[int]) -> None:
     
     # Iterate in reverse so upstream nodes fulfill orders before downstream nodes
+    
     for i in reversed(range(len(mdp.nodes))):
         node = mdp.nodes[i]
         info = state.node_infos[i]
