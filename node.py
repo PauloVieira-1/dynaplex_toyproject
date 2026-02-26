@@ -13,7 +13,7 @@ class Node:
     order_cost: float
     lead_time: int    
     upstream_ids: list[int]
-    downstream_ids: list[int] 
+    downstream_ids: list[int]  ## Maybe not neccesary to store downstream??
 
     def __init__(
         self,

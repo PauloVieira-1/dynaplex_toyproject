@@ -88,11 +88,11 @@ def train_PPO(mdp, number_iterations=50):
     if load_policy:
         print("Loading previously trained policy...")
         trained_policy = ppo_trainer.load_trained_policy()
-        print("Policy loaded successfully!")
+        print("Policy loaded successfully.")
     else:
         print("Training policy...")
         trained_policy = ppo_trainer.train()
-        print("Training completed!")
+        print("Training completed.")
 
     print(f"Trained policy: {trained_policy}")
 

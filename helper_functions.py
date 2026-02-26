@@ -13,6 +13,8 @@ def assert_state_valid(mdp, state: SupplyChainState):
     assert state.category == StateCategory.AWAIT_EVENT, "Not expecting an event right now."
     assert state.remaining_time > 0, "Simulation already finished."
     assert len(state.node_infos) == len(mdp.nodes), "State node infos length mismatch with number of nodes."
+    assert len(state.pending_orders) == len(mdp.nodes)
+    assert state.current_node_index < len(mdp.nodes)
 
 # -----------------------------------------------------------------------------------------------------------------
 
@@ -29,16 +31,19 @@ def process_inventory_and_pipeline(mdp, state: SupplyChainState) -> Tuple[List[i
         inventory = max(0, info.inventory_level)
         backorders = max(0, -info.inventory_level)
 
-        # Process pipeline arrivals
         if node.lead_time > 0 and info.pipeline:
 
-            arrived = info.pipeline.pop(0)
-            
+            arrived = 0
+            if info.pipeline:
+                arrived = info.pipeline.pop(0)
+                
             # if too much arrives then discarded (lost sales). 
             # there are other checks for this so i may remove these lines
 
-            inventory = min(node.capacity, inventory + arrived) 
+            inventory = min(node.capacity, inventory + arrived)
+  
 
+    
         # Fulfill backorders if possible
         fulfilled_backlog = min(inventory, backorders)
         inventory -= fulfilled_backlog
@@ -83,18 +88,44 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState, inventories: List[int]
             continue
 
         # Pending orders for this node (orders placed by this node to its upstream)
-        downstream_order = state.pending_orders[i]
+        order_qty = state.pending_orders[i]
 
         # if downstream_order == 0:
         #     continue
 
-        upstream_index = node.upstream_ids[0] - 1  # assumes single upstream for now
-        shipped = min(inventories[upstream_index], downstream_order)
 
-        # Reduce upstream inventory by shipped quantity
-        inventories[upstream_index] -= shipped
+        # Multi-node system (work in progress) ----> assumes each item from upstream nodes in the same 
+        
+        #-------------------------------------------------------------------
 
-        # Add shipped quantity to this node
+        total_shipped = 0
+
+        for upstream_node_id in node.upstream_ids:
+
+            # print(f"{upstream_node_id} being fulfilled")
+            
+            upstream_index = upstream_node_id - 1
+            available = inventories[upstream_index]
+            shipped = min(available, order_qty - total_shipped)
+
+            inventories[upstream_index] -= shipped
+            total_shipped += shipped
+
+            if total_shipped == order_qty:
+                break
+
+        #-------------------------------------------------------------------
+
+        # Single-node assumption
+        #-------------------------------------------------------------------
+
+        # upstream_index = node.upstream_ids[0] - 1  
+        # shipped = min(inventories[upstream_index], downstream_order)
+
+        # # Reduce upstream inventory by shipped quantity
+        # inventories[upstream_index] -= shipped
+
+        #-------------------------------------------------------------------
 
         if node.lead_time > 0:
             # Ensure pipeline has at least lead_time places 
@@ -108,14 +139,20 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState, inventories: List[int]
             '''
 
 
-            while len(info.pipeline) < node.lead_time:
-                info.pipeline.append(0)
+        # Shift pipeline daily
+
+        if node.lead_time > 0:
+            arrived_today = info.pipeline.pop(0) if info.pipeline else 0
+            inventories[i] = min(node.capacity, inventories[i] + arrived_today)
             
-            # Append shipped units to arrive after full lead time
-            info.pipeline.append(shipped)
+            if node.lead_time > 0:
+                while len(info.pipeline) < node.lead_time - 1:
+                    info.pipeline.append(0)
+                info.pipeline.append(total_shipped)
+            
 
         else:
-            inventories[i] = min(node.capacity, inventories[i] + shipped)
+            inventories[i] = min(node.capacity, inventories[i] + total_shipped)
 
         # Reset pending orders after fulfillment
         state.pending_orders[i] = 0

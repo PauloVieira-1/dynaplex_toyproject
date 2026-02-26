@@ -159,10 +159,27 @@ class SupplyChainMDP:
 
             if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest
 
-                upstream_node_index = current_node.upstream_ids[0] - 1 # Assuming single upstream (will chnage later for multiple)
-                state.pending_orders[upstream_node_index] += order_qty 
+                
+                # Multi-node system (work in progress)
+                #-------------------------------------------------------------------
 
-                # print(f"{upstream_node_index}, {state.pending_orders}")
+                for _ in current_node.upstream_ids:
+            
+                    state.pending_orders[state.current_node_index] += order_qty
+
+                #-------------------------------------------------------------------
+
+
+                # Single-node assumption
+                #-------------------------------------------------------------------
+
+                # upstream_node_index = current_node.upstream_ids[0] - 1 # Assuming single upstream (will chnage later for multiple)
+                # state.pending_orders[upstream_node_index] += order_qty 
+
+                # # print(f"{upstream_node_index}, {state.pending_orders}")
+
+                #-------------------------------------------------------------------
+
 
             else:
 
@@ -301,41 +318,69 @@ def main() -> None:
         order_cost=2.0,
         lead_time=2,
         upstream_ids=[],
-        downstream_ids=[],
+        downstream_ids=[4],
     )
 
-    policy_node_1 = BaseStockPolicy(node=node_1, target_inventory=10, safety_stock=5, price_per_unit=20.0)
+    policy_node_1 = BaseStockPolicy(node=node_1, target_inventory=10, safety_stock=5, price_per_unit=10.0)
 
-    node_2 = Node(
+    node_2= Node(
         id=2,
         name="Node_2",
+        capacity=20,
+        holding_cost=1.0,
+        backlog_cost=3.0,
+        order_cost=5.0,
+        lead_time=3,
+        upstream_ids=[],
+        downstream_ids=[4],
+    )
+
+    policy_node_2 = BaseStockPolicy(node=node_2, target_inventory=10, safety_stock=5, price_per_unit=15.0)
+
+    node_3 = Node(
+        id=3,
+        name="Node_3",
+        capacity=20,
+        holding_cost=1.0,
+        backlog_cost=10.0,
+        order_cost=2.0,
+        lead_time=4,
+        upstream_ids=[],
+        downstream_ids=[4],
+    )
+
+    policy_node_3 = BaseStockPolicy(node=node_3, target_inventory=10, safety_stock=5, price_per_unit=20.0)
+
+    node_4 = Node(
+        id=4,
+        name="Node_4",
         capacity=15,
         holding_cost=0.5,
         backlog_cost=3.0,
         order_cost=1.5,
         lead_time=1,
-        upstream_ids=[1],
-        downstream_ids=[],
+        upstream_ids=[1,2,3],
+        downstream_ids=[5],
     )
 
-    policy_node_2 = BaseStockPolicy(node=node_2, target_inventory=8, safety_stock=3, price_per_unit=20.0)
+    policy_node_4 = BaseStockPolicy(node=node_4, target_inventory=8, safety_stock=3, price_per_unit=20.0)
 
-    node_3 = Node(
-        id=3,
-        name="Node_3",
+    node_5 = Node(
+        id=5,
+        name="Node_5",
         capacity=10,
         holding_cost=0.2,
         backlog_cost=10.0,
         order_cost=1.0,
         lead_time=0,
-        upstream_ids=[2],
+        upstream_ids=[4],
         downstream_ids=[],
     )
 
-    policy_node_3 = BaseStockPolicy(node=node_3, target_inventory=5, safety_stock=2, price_per_unit=20.0)
+    policy_node_5 = BaseStockPolicy(node=node_5, target_inventory=5, safety_stock=2, price_per_unit=20.0)
 
     mdp = SupplyChainMDP(
-        nodes=[node_1, node_2, node_3],   
+        nodes=[node_1, node_2, node_3, node_4, node_5],   
         initial_horizon=15,
     )
 
@@ -362,7 +407,7 @@ def main() -> None:
     # Run baseline simulation with the initial policy
     # ------------------------------------------------
 
-    policy_list = [policy_node_1, policy_node_2, policy_node_3]
+    policy_list = [policy_node_1, policy_node_2, policy_node_3, policy_node_4, policy_node_5]
 
     simulate_episode(mdp, policy_list, seed=42)
 
