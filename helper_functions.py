@@ -134,7 +134,7 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState, inventories: List[int]
             '''
             The position (index) in the pipeline indicates when items arrive at the stockpoint:
 
-                pipeline[0] = 3  means 3 units arrive tomorrow
+                pipeline[0] = 3 means 3 units arrive tomorrow
                 pipeline[1] = 5 means 5 units arrive in 2 days
             
             '''
