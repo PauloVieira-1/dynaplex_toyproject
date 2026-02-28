@@ -1,16 +1,16 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
-from custom_types import SupplyChainState, NodeInfo
+from types.custom_types import SupplyChainState, NodeInfo
 
 import numpy as np
 from numpy.typing import NDArray
 
 from dynaplex.modelling import StateCategory, TrajectoryContext, HorizonType, discover_num_features, Features
-from node import Node
-from policy import BasePolicy, BaseStockPolicy
-from graph import create_graph_window
-from PPO import decode_action, encode_action, train_PPO
+from types.node import Node
+from models.policy import BasePolicy, BaseStockPolicy
+from evaluation.graph import create_graph_window
+from models.PPO import decode_action, encode_action, train_PPO
 
 from helper_functions import *
 
