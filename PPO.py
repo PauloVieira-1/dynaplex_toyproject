@@ -74,7 +74,7 @@ def train_PPO(mdp, number_iterations=50):
         lr=3e-4,
         total_timesteps=100000, # Total n. interactions across all iterations
         logdir=None,  
-        num_envs=8, # Number of parallel environments for data collection (speeds up training)
+        num_envs=8, # Number of parallel environments for data collection 
     )
 
 
