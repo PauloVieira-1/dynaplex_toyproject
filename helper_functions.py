@@ -1,5 +1,5 @@
 from typing import List, Tuple
-from types.custom_types import SupplyChainState
+from custom_types import SupplyChainState
 from dynaplex.modelling import TrajectoryContext, StateCategory
 
 

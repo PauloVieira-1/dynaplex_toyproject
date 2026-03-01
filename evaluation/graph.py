@@ -6,8 +6,7 @@ from typing import List, Tuple, Optional, Dict
 import networkx as nx
 import plotly.graph_objects as go
 
-from types.node import Node
-from types.custom_types import NodeInfo
+from custom_types import NodeInfo, Node
 
 
 def shorten_edge(x0: float, y0: float, x1: float, y1: float, r: float) -> Tuple[float, float, float, float]:
