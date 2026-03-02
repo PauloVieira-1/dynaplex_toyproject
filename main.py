@@ -13,11 +13,6 @@ from models.PPO import decode_action, encode_action, train_PPO
 
 from helper_functions import *
 
-
-
-# Supply Chain MDP
-# -----------------
-
 @dataclass(slots=True)
 class SupplyChainMDP:
     nodes: List[Node]
@@ -29,10 +24,10 @@ class SupplyChainMDP:
 
     def __init__(self, nodes: List[Node], initial_horizon: int):
 
-
-        # Maybe abstract this into a function latwer
+        # Maybe abstract this into a function later
         # ---------------------------------------------------------------------------------------------
 
+        
         assert len(nodes) > 0, "Supply chain must have at least one node."
         assert initial_horizon > 0, "Initial horizon must be positive."
         assert all(node.capacity > 0 for node in nodes), "All nodes must have positive capacity."
@@ -87,18 +82,14 @@ class SupplyChainMDP:
         # I will possibly be doing the same for modify_state_with_action
 
 
-        inventories, backorders_list = process_inventory_and_pipeline(self, state)
+        process_inventory_and_pipeline(self, state)
 
-    # 1) Process demand at the last node
-        process_demand(self, state, context, inventories, backorders_list)
+        process_demand(self, state, context)
 
-    # 2) Fulfill upstream orders
-        fulfill_upstream_orders(self, state, inventories)
+        fulfill_upstream_orders(self, state)
 
-    # 3) Update node infos and compute costs
-        update_node_infos_and_costs(self, state, context, inventories, backorders_list)
+        update_node_infos_and_costs(self, state, context)
 
-    # Check state validity after all updates
         assert_state_valid(self, state)
 
 
@@ -161,6 +152,8 @@ class SupplyChainMDP:
                 
                 # Multi-node system (work in progress)
                 #-------------------------------------------------------------------
+
+                # If a node has 3 upstream suppliers and orders 5, this will create a pending order of 15. (needs to be chnaged later)
 
                 for _ in current_node.upstream_ids:
             
