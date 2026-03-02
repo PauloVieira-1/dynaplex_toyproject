@@ -20,23 +20,14 @@ def assert_state_valid(mdp, state: SupplyChainState):
 
 
 
-def process_inventory_and_pipeline(mdp, state: SupplyChainState) -> Tuple[List[int], List[int]]:
+def process_inventory_and_pipeline(mdp, state: SupplyChainState) -> None:
 
     for node, info in zip(mdp.nodes, state.node_infos):
 
         # Separate inventory and backlog from NodeInfo
+        # Pipeline arrivals are handled in fulfill_upstream_orders — do not process them here
         inventory = max(0, info.inventory_level)
         backorders = max(0, -info.inventory_level)
-
-        # Process pipeline arrivals if node has lead time
-
-        if node.lead_time > 0 and info.pipeline:
-            arrived = info.pipeline.pop(0)
-
-            # if too much arrives then discarded (lost sales). 
-            # there are other checks for this so i may remove these lines
-
-            inventory = min(node.capacity, inventory + arrived)
 
         info.inventory_level = inventory - backorders
 
@@ -46,7 +37,6 @@ def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> 
 
     last_node_index = len(mdp.nodes) - 1 #!!! demand is only generated at last node !!!
     last_node_info = state.node_infos[last_node_index]
-    last_node = mdp.nodes[last_node_index]
 
 
     #! Example demand distribution for now (to be chnaged later) 
@@ -122,13 +112,13 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             
             '''
 
-
         # Shift pipeline daily
-
         if node.lead_time > 0 and info.pipeline:
             arrived_today = info.pipeline.pop(0)
-            info.inventory_level += arrived_today
-            info.inventory_level = min(info.inventory_level, node.capacity)
+
+            # Fill backorders first, then add remainder to inventory
+            net = info.inventory_level + arrived_today
+            info.inventory_level = min(node.capacity, net)
 
             while len(info.pipeline) < node.lead_time:
                 info.pipeline.append(0)

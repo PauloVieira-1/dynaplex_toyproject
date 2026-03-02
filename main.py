@@ -84,9 +84,9 @@ class SupplyChainMDP:
 
         process_inventory_and_pipeline(self, state)
 
-        process_demand(self, state, context)
-
         fulfill_upstream_orders(self, state)
+
+        process_demand(self, state, context)
 
         update_node_infos_and_costs(self, state, context)
 
