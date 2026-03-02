@@ -20,36 +20,6 @@ def assert_state_valid(mdp, state: SupplyChainState):
 
 
 
-def process_inventory_and_pipeline(mdp, state: SupplyChainState) -> None:
-
-    for node, info in zip(mdp.nodes, state.node_infos):
-
-        # Separate inventory and backlog from NodeInfo
-        # Pipeline arrivals are handled in fulfill_upstream_orders — do not process them here
-        inventory = max(0, info.inventory_level)
-        backorders = max(0, -info.inventory_level)
-
-        info.inventory_level = inventory - backorders
-
-
-def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
-
-
-    last_node_index = len(mdp.nodes) - 1 #!!! demand is only generated at last node !!!
-    last_node_info = state.node_infos[last_node_index]
-
-
-    #! Example demand distribution for now (to be chnaged later) 
-    # ASML has a pyramid like structure, should be put in a function at later stage 
-
-    demand = context.rng.poisson(lam=5)  
-
-    available_inventory = max(0, last_node_info.inventory_level)
-    fulfilled = min(available_inventory, demand)
-
-    last_node_info.inventory_level = available_inventory - fulfilled - (demand - fulfilled)
-
-
 def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
     
     # Iterate in reverse so upstream nodes fulfill orders before downstream nodes
@@ -77,7 +47,7 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             upstream_info = state.node_infos[upstream_idx]
 
             # Ship as much as possible (up to available inventory)
-            shipped = min(upstream_info.inventory_level, order_qty - total_shipped)
+            shipped = min(max(0, upstream_info.inventory_level), order_qty - total_shipped)
             upstream_info.inventory_level -= shipped
             total_shipped += shipped
 
@@ -132,6 +102,24 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
 
         # Reset pending orders
         state.pending_orders[i] = 0
+
+
+def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
+
+
+    last_node_index = len(mdp.nodes) - 1 #!!! demand is only generated at last node !!!
+    last_node_info = state.node_infos[last_node_index]
+
+
+    #! Example demand distribution for now (to be chnaged later) 
+    # ASML has a pyramid like structure, should be put in a function at later stage 
+
+    demand = context.rng.poisson(lam=5)  
+
+    available_inventory = max(0, last_node_info.inventory_level)
+    fulfilled = min(available_inventory, demand)
+
+    last_node_info.inventory_level = available_inventory - fulfilled - (demand - fulfilled)
 
 
 

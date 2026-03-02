@@ -82,8 +82,6 @@ class SupplyChainMDP:
         # I will possibly be doing the same for modify_state_with_action
 
 
-        process_inventory_and_pipeline(self, state)
-
         fulfill_upstream_orders(self, state)
 
         process_demand(self, state, context)
