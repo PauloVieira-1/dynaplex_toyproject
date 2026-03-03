@@ -26,12 +26,19 @@ def advance_source_pipelines(mdp, state: SupplyChainState) -> None:
         info = state.node_infos[i]
 
         # This is a source node meaning it has no upstream nodes 
-        if node.lead_time > 0 and info.pipeline:
+        if node.lead_time > 0:
+
+            while len(info.pipeline) < node.lead_time:
+                info.pipeline.append(0)
 
             arrived_today = info.pipeline.pop(0)
             info.inventory_level = min(node.capacity, info.inventory_level + arrived_today)
+
+            # Keep pipeline at correct length for future arrivals
             while len(info.pipeline) < node.lead_time:
                 info.pipeline.append(0)
+
+                
 
 def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
     
@@ -48,39 +55,43 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
         # Pending orders for this node (orders placed by this node to its upstream)
         order_qty = state.pending_orders[i]
 
-
         # Multi-node system (work in progress) ----> assumes each item from upstream nodes in the same 
         
         #-------------------------------------------------------------------
+     
 
-        total_shipped = 0
+        requested = order_qty
+        if requested <= 0:
+            state.pending_orders[i] = 0
+            continue
+
+        possible = requested
+        upstream_inventories = []
 
         for upstream_id in node.upstream_ids:
-            upstream_idx = upstream_id - 1
+            upstream_idx = upstream_id - 1  
             upstream_info = state.node_infos[upstream_idx]
+            available = max(0, upstream_info.inventory_level)   # never use negative inventory
+            possible = min(possible, available)
+            upstream_inventories.append((upstream_idx, available))
 
-            # Ship as much as possible (up to available inventory)
-            shipped = min(max(0, upstream_info.inventory_level), order_qty - total_shipped) # min to avoid negative inventory, and max to avoid over-shipping (backlog)
-            upstream_info.inventory_level -= shipped
-            total_shipped += shipped
+        # Now ship 'possible' units → subtract from EACH upstream
+        shipped = possible
 
-            if total_shipped >= order_qty:
-                break
+        for up_idx, _ in upstream_inventories:
+            state.node_infos[up_idx].inventory_level -= shipped
 
-        # Any unfulfilled order becomes backlog (negative inventory)
-        unfulfilled = order_qty - total_shipped
+        # Any unfulfilled order becomes backlog (negative inventory at this node)
+        unfulfilled = requested - shipped
 
         #-------------------------------------------------------------------
 
-        # Single-node assumption
+        # Single-node assumption  (your original single upstream comment block - kept for reference)
         #-------------------------------------------------------------------
-
         # upstream_index = node.upstream_ids[0] - 1  
         # shipped = min(inventories[upstream_index], downstream_order)
-
         # # Reduce upstream inventory by shipped quantity
         # inventories[upstream_index] -= shipped
-
         #-------------------------------------------------------------------
 
         if node.lead_time > 0:
@@ -106,16 +117,16 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
                 info.pipeline.append(0)
 
             # Add shipped items to pipeline for future arrival
-            info.pipeline[-1] += total_shipped
+            info.pipeline[-1] += shipped
+
         else:
 
             # Immediate arrival for zero lead time
-            net = info.inventory_level + total_shipped - unfulfilled
+            net = info.inventory_level + shipped - unfulfilled
             info.inventory_level = min(net, node.capacity)
 
         # Reset pending orders
         state.pending_orders[i] = 0
-
 
 def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
     

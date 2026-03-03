@@ -165,7 +165,6 @@ class SupplyChainMDP:
 
             else:
 
-            
                 # if lead_time > 0, items always enter pipeline[-1]
                 # if lead_time == 0, items arrive immediately
 
@@ -173,12 +172,11 @@ class SupplyChainMDP:
 
                     # Ensure pipeline is the correct length before inserting
                     while len(current_node_info.pipeline) < current_node.lead_time:
-                        current_node_info.pipeline.append(0)
+                        current_node_info.pipeline.append(0)                         
 
                     # Items enter the back of the pipeline; they arrive after lead_time days
                     current_node_info.pipeline[-1] += order_qty
 
-                
                 else:
 
                     # Added capacity cap for zero-lead-time source node 
@@ -187,9 +185,6 @@ class SupplyChainMDP:
                         current_node.capacity,
                         current_node_info.inventory_level + order_qty
                     )
-
-
-
 
 
         # Transition logic might be incorrect? 
@@ -367,7 +362,7 @@ def main() -> None:
     )
 
     mdp = SupplyChainMDP(
-        nodes=[node_1, node_2, node_3, node_4, node_5],
+        nodes = [node_1, node_2, node_3, node_4, node_5],
         initial_horizon=15,
     )
 
