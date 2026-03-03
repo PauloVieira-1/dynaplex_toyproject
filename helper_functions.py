@@ -18,14 +18,11 @@ def assert_state_valid(mdp, state: SupplyChainState):
 
 # -----------------------------------------------------------------------------------------------------------------
 
-def advance_source_pipelines(mdp, state: SupplyChainState) -> None:
+def advance_all_pipelines(mdp, state: SupplyChainState) -> None:
 
     for i, node in enumerate(mdp.nodes):
-        if node.upstream_ids:  # not a source node!!!
-            continue
         info = state.node_infos[i]
 
-        # This is a source node meaning it has no upstream nodes 
         if node.lead_time > 0:
 
             while len(info.pipeline) < node.lead_time:
@@ -34,7 +31,6 @@ def advance_source_pipelines(mdp, state: SupplyChainState) -> None:
             arrived_today = info.pipeline.pop(0)
             info.inventory_level = min(node.capacity, info.inventory_level + arrived_today)
 
-            # Keep pipeline at correct length for future arrivals
             while len(info.pipeline) < node.lead_time:
                 info.pipeline.append(0)
 
@@ -59,30 +55,34 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
         
         #-------------------------------------------------------------------
      
-
         requested = order_qty
         if requested <= 0:
             state.pending_orders[i] = 0
             continue
 
-        possible = requested
-        upstream_inventories = []
+        k = len(node.upstream_ids)
+        equal_share = requested // k
+
+        if equal_share <= 0:
+            state.pending_orders[i] = 0
+            continue
+
+        max_share = float('inf')
 
         for upstream_id in node.upstream_ids:
             upstream_idx = upstream_id - 1  
             upstream_info = state.node_infos[upstream_idx]
             available = max(0, upstream_info.inventory_level)   # never use negative inventory
-            possible = min(possible, available)
-            upstream_inventories.append((upstream_idx, available))
+            max_share = min(max_share, available)
 
-        # Now ship 'possible' units → subtract from EACH upstream
-        shipped = possible
+        actual_share = min(equal_share, max_share)
 
-        for up_idx, _ in upstream_inventories:
-            state.node_infos[up_idx].inventory_level -= shipped
-
-        # Any unfulfilled order becomes backlog (negative inventory at this node)
+        shipped = actual_share * k
         unfulfilled = requested - shipped
+
+        for upstream_id in node.upstream_ids:
+            upstream_idx = upstream_id - 1
+            state.node_infos[upstream_idx].inventory_level -= actual_share
 
         #-------------------------------------------------------------------
 
@@ -95,7 +95,6 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
         #-------------------------------------------------------------------
 
         if node.lead_time > 0:
-            # Ensure pipeline has at least lead_time places 
 
             '''
             The position (index) in the pipeline indicates when items arrive at the stockpoint:
@@ -105,19 +104,8 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             
             '''
 
-        # Shift pipeline daily
-        if node.lead_time > 0 and info.pipeline:
-            
-            arrived_today = info.pipeline.pop(0)
-
-            net = info.inventory_level + arrived_today - unfulfilled
-            info.inventory_level = min(node.capacity, net)
-
-            while len(info.pipeline) < node.lead_time:
-                info.pipeline.append(0)
-
-            # Add shipped items to pipeline for future arrival
             info.pipeline[-1] += shipped
+            info.inventory_level -= unfulfilled
 
         else:
 
@@ -127,6 +115,9 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
 
         # Reset pending orders
         state.pending_orders[i] = 0
+
+
+        
 
 def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
     
