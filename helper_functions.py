@@ -118,10 +118,9 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
 
 
 def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
-
-
-    last_node_index = len(mdp.nodes) - 1 #!!! demand is only generated at last node !!!
-    last_node_info = state.node_infos[last_node_index]
+    
+    final_node_index = next(i for i, node in enumerate(mdp.nodes) if not node.downstream_ids)
+    last_node_info = state.node_infos[final_node_index]
 
 
     #! Example demand distribution for now (to be chnaged later) 

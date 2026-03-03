@@ -4,6 +4,7 @@ from typing import List
 from dynaplex.modelling import StateCategory
 
 
+
 @dataclass(slots=True)
 class NodeInfo:
     inventory_level: int  # positive = inventory, negative = backlog

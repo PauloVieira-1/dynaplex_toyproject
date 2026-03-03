@@ -21,6 +21,7 @@ class SupplyChainMDP:
     num_features: int
     num_actions: int
     action_dims: List[int]
+    
 
     def __init__(self, nodes: List[Node], initial_horizon: int):
 
@@ -155,29 +156,12 @@ class SupplyChainMDP:
 
             if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest
 
-                
                 # Multi-node system (work in progress)
                 #-------------------------------------------------------------------
 
-                # If a node has 3 upstream suppliers and orders 5, this will create a pending order of 15. (needs to be chnaged later)
-
-                for _ in current_node.upstream_ids:
-            
-                    state.pending_orders[state.current_node_index] += order_qty
+                state.pending_orders[state.current_node_index] = order_qty
 
                 #-------------------------------------------------------------------
-
-
-                # Single-node assumption
-                #-------------------------------------------------------------------
-
-                # upstream_node_index = current_node.upstream_ids[0] - 1 # Assuming single upstream (will chnage later for multiple)
-                # state.pending_orders[upstream_node_index] += order_qty 
-
-                # # print(f"{upstream_node_index}, {state.pending_orders}")
-
-                #-------------------------------------------------------------------
-
 
             else:
 
