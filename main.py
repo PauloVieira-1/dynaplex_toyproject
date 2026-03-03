@@ -84,6 +84,7 @@ class SupplyChainMDP:
         # I decided to abstract each "step" into a functions in helper_functions.py because modify_state_with_event grew far too big 
         # I will possibly be doing the same for modify_state_with_action
 
+        advance_source_pipelines(self, state)
 
         fulfill_upstream_orders(self, state)
 

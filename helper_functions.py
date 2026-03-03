@@ -18,7 +18,20 @@ def assert_state_valid(mdp, state: SupplyChainState):
 
 # -----------------------------------------------------------------------------------------------------------------
 
+def advance_source_pipelines(mdp, state: SupplyChainState) -> None:
 
+    for i, node in enumerate(mdp.nodes):
+        if node.upstream_ids:  # not a source node!!!
+            continue
+        info = state.node_infos[i]
+
+        # This is a source node meaning it has no upstream nodes 
+        if node.lead_time > 0 and info.pipeline:
+
+            arrived_today = info.pipeline.pop(0)
+            info.inventory_level = min(node.capacity, info.inventory_level + arrived_today)
+            while len(info.pipeline) < node.lead_time:
+                info.pipeline.append(0)
 
 def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
     
