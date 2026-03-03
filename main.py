@@ -41,7 +41,7 @@ class SupplyChainMDP:
 
         self.nodes = nodes
         self.initial_horizon = initial_horizon
-        self.horizon_type = HorizonType.FINITE # should work on making finite 
+        self.horizon_type = HorizonType.FINITE # should work on making infinite 
 
 
         self.action_dims = [node.capacity + 1 for node in nodes] # Each node can order from 0 up to its capacity
@@ -77,6 +77,9 @@ class SupplyChainMDP:
 
 
     def modify_state_with_event(self, state: SupplyChainState, context: TrajectoryContext) -> None:
+        """
+        This is a function that modifies the state of the supply chain based on the current event, which is the arrival of an order.
+        """
 
         # I decided to abstract each "step" into a functions in helper_functions.py because modify_state_with_event grew far too big 
         # I will possibly be doing the same for modify_state_with_action
@@ -113,6 +116,10 @@ class SupplyChainMDP:
 
 
     def modify_state_with_action(self, state: SupplyChainState, context: TrajectoryContext, action: int) -> None:
+        """
+        This is called when the agent takes an action. In this case, the action is the order quantity for the current node.
+
+        """
         
 
         # assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action."
@@ -173,18 +180,30 @@ class SupplyChainMDP:
 
             else:
 
+            
+                # if lead_time > 0, items always enter pipeline[-1]
+                # if lead_time == 0, items arrive immediately
+
                 if current_node.lead_time > 0:
 
-                    # Always go into pipeline (including source node)
-                    if len(current_node_info.pipeline) < current_node.lead_time:
-                        current_node_info.pipeline.extend(
-                            [0] * (current_node.lead_time - len(current_node_info.pipeline))
-                        )
-                        current_node_info.inventory_level = min(current_node.capacity, current_node_info.inventory_level + order_qty)               
-                    else:
+                    # Ensure pipeline is the correct length before inserting
+                    while len(current_node_info.pipeline) < current_node.lead_time:
+                        current_node_info.pipeline.append(0)
 
-                        # Immediate arrival (even for source)
-                        current_node_info.inventory_level += order_qty
+                    # Items enter the back of the pipeline; they arrive after lead_time days
+                    current_node_info.pipeline[-1] += order_qty
+
+                
+                else:
+
+                    # Added capacity cap for zero-lead-time source node 
+                    # no lead time means the items arrive immediately
+                    current_node_info.inventory_level = min(
+                        current_node.capacity,
+                        current_node_info.inventory_level + order_qty
+                    )
+
+
 
 
 
@@ -262,6 +281,7 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42) -> None:
             print(f"    Post-Event State: {state}")
 
         elif state.category == StateCategory.AWAIT_ACTION:
+            
             current_node_idx = state.current_node_index
             current_node_name = mdp.nodes[current_node_idx].name
             

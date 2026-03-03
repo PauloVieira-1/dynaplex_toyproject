@@ -47,7 +47,7 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             upstream_info = state.node_infos[upstream_idx]
 
             # Ship as much as possible (up to available inventory)
-            shipped = min(max(0, upstream_info.inventory_level), order_qty - total_shipped)
+            shipped = min(max(0, upstream_info.inventory_level), order_qty - total_shipped) # min to avoid negative inventory, and max to avoid over-shipping (backlog)
             upstream_info.inventory_level -= shipped
             total_shipped += shipped
 
@@ -56,7 +56,6 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
 
         # Any unfulfilled order becomes backlog (negative inventory)
         unfulfilled = order_qty - total_shipped
-        info.inventory_level -= unfulfilled
 
         #-------------------------------------------------------------------
 
@@ -84,10 +83,10 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
 
         # Shift pipeline daily
         if node.lead_time > 0 and info.pipeline:
+            
             arrived_today = info.pipeline.pop(0)
 
-            # Fill backorders first, then add remainder to inventory
-            net = info.inventory_level + arrived_today
+            net = info.inventory_level + arrived_today - unfulfilled
             info.inventory_level = min(node.capacity, net)
 
             while len(info.pipeline) < node.lead_time:
@@ -96,9 +95,10 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             # Add shipped items to pipeline for future arrival
             info.pipeline[-1] += total_shipped
         else:
+
             # Immediate arrival for zero lead time
-            info.inventory_level += total_shipped
-            info.inventory_level = min(info.inventory_level, node.capacity)
+            net = info.inventory_level + total_shipped - unfulfilled
+            info.inventory_level = min(net, node.capacity)
 
         # Reset pending orders
         state.pending_orders[i] = 0
@@ -115,11 +115,7 @@ def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> 
     # ASML has a pyramid like structure, should be put in a function at later stage 
 
     demand = context.rng.poisson(lam=5)  
-
-    available_inventory = max(0, last_node_info.inventory_level)
-    fulfilled = min(available_inventory, demand)
-
-    last_node_info.inventory_level = available_inventory - fulfilled - (demand - fulfilled)
+    last_node_info.inventory_level -= demand
 
 
 
