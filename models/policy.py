@@ -20,10 +20,8 @@ class BasePolicy:
 
 @dataclass
 class BaseStockPolicy(BasePolicy):
-    """
-    Base-stock policy with safety stock.
-    Orders up to (target + safety) inventory position.
-    """
+
+    # Default parameters should be adjusted later
     target_inventory: int = 50
     safety_stock: int = 10
     price_per_unit: float = 20.0
@@ -45,17 +43,16 @@ class BaseStockPolicy(BasePolicy):
 
         total_pending = sum(node_info.pipeline)
 
-        # Inventory position = on-hand - backlog + on-order
-        inventory_position = node_info.inventory_level + total_pending - max(0, node_info.inventory_level)  # Backlog is negative inventory, so subtract it out
+        # Inventory position = on-hand - backlog + pending (see SupplyChainState)
+        inventory_position = node_info.inventory_level + total_pending
         base_stock_level = self.target_inventory + self.safety_stock
 
         order_quantity = max(0, base_stock_level - inventory_position)
 
-        # Respect capacity constraint
         on_hand = max(0, node_info.inventory_level)
         max_feasible = self.node.capacity - on_hand
 
-        return int(min(order_quantity, max_feasible))
+        return int(min(order_quantity, max(0, max_feasible)))
 
 
 # Min-Max Policy (s, S)
@@ -63,10 +60,7 @@ class BaseStockPolicy(BasePolicy):
 
 @dataclass
 class MinMaxPolicy(BasePolicy):
-    """
-    Min-max (s, S) policy.
-    Orders up to S when inventory position falls below s.
-    """
+
     min_inventory: int = 20
     max_inventory: int = 80
     price_per_unit: float = 20.0
@@ -87,7 +81,7 @@ class MinMaxPolicy(BasePolicy):
             on_hand = max(0, node_info.inventory_level)
             max_feasible = self.node.capacity - on_hand
 
-            return int(min(order_quantity, max_feasible))
+            return int(min(order_quantity, max(0, max_feasible)))
 
         return 0
 
@@ -97,12 +91,9 @@ class MinMaxPolicy(BasePolicy):
 
 @dataclass
 class FixedOrderPolicy(BasePolicy):
-    """
-    Fixed order quantity policy.
-    Always orders a fixed quantity each period, regardless of state.
-    """
+
     order_quantity: int = 30
-    price_per_unit: float = 20.0
+    price_per_unit: float = 20.0 # Should be sey by noode (change later)
 
     def set_parameters(self, **kwargs) -> None:
         for key, value in kwargs.items():
@@ -111,14 +102,12 @@ class FixedOrderPolicy(BasePolicy):
 
     def get_action(self, node_info) -> int:
         available_capacity = self.node.capacity - max(0, node_info.inventory_level)
-
         return int(min(self.order_quantity, max(0, available_capacity)))
 
+
 class RandomChoice(BasePolicy):
-    
-    """
-    Absurd random choice policy to test if the environment is working.
-    """
+
+    price_per_unit: float = 20.0
 
     def set_parameters(self, **kwargs) -> None:
         for key, value in kwargs.items():
@@ -126,6 +115,4 @@ class RandomChoice(BasePolicy):
                 setattr(self, key, value)
 
     def get_action(self, node_info) -> int:
-        random_number = rd.randrange(0, self.node.capacity)
-        return random_number
-    
+        return rd.randrange(0, self.node.capacity + 1)

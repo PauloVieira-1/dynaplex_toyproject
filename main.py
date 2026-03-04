@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dynaplex.modelling import StateCategory, TrajectoryContext, HorizonType, discover_num_features, Features
-from models.policy import BasePolicy, BaseStockPolicy
+from models.policy import BaseStockPolicy, RandomChoice
 from evaluation.graph import create_graph_window
 from models.PPO import decode_action, encode_action, train_PPO
 
@@ -360,15 +360,6 @@ def main() -> None:
         initial_horizon=15,
     )
 
-    # Policies 
-
-    policy_node_5 = BaseStockPolicy(node=node_5, target_inventory=10, safety_stock=5, price_per_unit=10.0)
-    policy_node_4 = BaseStockPolicy(node=node_4, target_inventory=10, safety_stock=5, price_per_unit=15.0)
-    policy_node_3 = BaseStockPolicy(node=node_3, target_inventory=10, safety_stock=5, price_per_unit=20.0)
-    policy_node_2 = BaseStockPolicy(node=node_2, target_inventory=8, safety_stock=3, price_per_unit=20.0)
-    policy_node_1 = BaseStockPolicy(node=node_1, target_inventory=5, safety_stock=2, price_per_unit=20.0)
-    policy_list = [policy_node_5, policy_node_4, policy_node_3, policy_node_2, policy_node_1]
-
 
     # Generate Visualization
     # ------------------------------------------------
@@ -388,12 +379,26 @@ def main() -> None:
     # Run simulation with random orders 
     # ------------------------------------------------
 
-    policy_list = [policy_node_1, policy_node_2, policy_node_3, policy_node_4, policy_node_5]
+    policy_node_5 = RandomChoice(node=node_5)
+    policy_node_4 = RandomChoice(node=node_4)
+    policy_node_3 = RandomChoice(node=node_3)
+    policy_node_2 = RandomChoice(node=node_2)
+    policy_node_1 = RandomChoice(node=node_1)
+
+    policy_list = [policy_node_5, policy_node_4, policy_node_3, policy_node_2, policy_node_1]
 
     simulate_episode(mdp, policy_list, seed=42, name="Random")
 
     # Run baseline simulation with the initial policy
     # ------------------------------------------------
+
+    policy_node_5 = BaseStockPolicy(node=node_5, target_inventory=10, safety_stock=5, price_per_unit=10.0)
+    policy_node_4 = BaseStockPolicy(node=node_4, target_inventory=10, safety_stock=5, price_per_unit=15.0)
+    policy_node_3 = BaseStockPolicy(node=node_3, target_inventory=10, safety_stock=5, price_per_unit=20.0)
+    policy_node_2 = BaseStockPolicy(node=node_2, target_inventory=8, safety_stock=3, price_per_unit=20.0)
+    policy_node_1 = BaseStockPolicy(node=node_1, target_inventory=5, safety_stock=2, price_per_unit=20.0)
+    
+    policy_list = [policy_node_5, policy_node_4, policy_node_3, policy_node_2, policy_node_1]
 
     simulate_episode(mdp, policy_list, seed=42, name="Baseline")
 
