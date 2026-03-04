@@ -84,16 +84,6 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             upstream_idx = upstream_id - 1
             state.node_infos[upstream_idx].inventory_level -= actual_share
 
-        #-------------------------------------------------------------------
-
-        # Single-node assumption  (your original single upstream comment block - kept for reference)
-        #-------------------------------------------------------------------
-        # upstream_index = node.upstream_ids[0] - 1  
-        # shipped = min(inventories[upstream_index], downstream_order)
-        # # Reduce upstream inventory by shipped quantity
-        # inventories[upstream_index] -= shipped
-        #-------------------------------------------------------------------
-
         if node.lead_time > 0:
 
             '''

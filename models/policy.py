@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from custom_types import SupplyChainState, Node
+import random as rd
 
 
 @dataclass
@@ -112,3 +113,19 @@ class FixedOrderPolicy(BasePolicy):
         available_capacity = self.node.capacity - max(0, node_info.inventory_level)
 
         return int(min(self.order_quantity, max(0, available_capacity)))
+
+class RandomChoice(BasePolicy):
+    
+    """
+    Absurd random choice policy to test if the environment is working.
+    """
+
+    def set_parameters(self, **kwargs) -> None:
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+    def get_action(self, node_info) -> int:
+        random_number = rd.randrange(0, self.node.capacity)
+        return random_number
+    

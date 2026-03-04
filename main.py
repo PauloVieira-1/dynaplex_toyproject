@@ -15,6 +15,7 @@ from helper_functions import *
 
 @dataclass(slots=True)
 class SupplyChainMDP:
+
     nodes: List[Node]
     initial_horizon: int
     horizon_type: HorizonType
@@ -27,7 +28,6 @@ class SupplyChainMDP:
 
         # Maybe abstract this into a function later
         # ---------------------------------------------------------------------------------------------
-
         
         assert len(nodes) > 0, "Supply chain must have at least one node."
         assert initial_horizon > 0, "Initial horizon must be positive."
@@ -38,7 +38,6 @@ class SupplyChainMDP:
         assert all(node.lead_time >= 0 for node in nodes), "All nodes must have non-negative lead time."
 
         # ---------------------------------------------------------------------------------------------
-
 
         self.nodes = nodes
         self.initial_horizon = initial_horizon
@@ -123,9 +122,9 @@ class SupplyChainMDP:
 
         """
         
-
-        # assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action."
-        # assert state.remaining_time > 0, "Simulation finished."
+        # abstract these elsewhere later 
+            # assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action."
+            # assert state.remaining_time > 0, "Simulation finished."
 
         # ---------------------------------------------------------------------------------------------------
 
@@ -154,14 +153,9 @@ class SupplyChainMDP:
             # Orders always represent a request to upstream now 
             # In past implementation, if the node had no upstream, the system structure was ignored 
 
-            if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest
-
-                # Multi-node system (work in progress)
-                #-------------------------------------------------------------------
+            if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest           
 
                 state.pending_orders[state.current_node_index] = order_qty
-
-                #-------------------------------------------------------------------
 
             else:
 
@@ -241,13 +235,13 @@ class SupplyChainMDP:
 # Simulation
 # ------------
 
-def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42) -> None:
+def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str = "episode") -> None:
     
     context = TrajectoryContext(rng=np.random.default_rng(seed))
     state = mdp.get_initial_state(context)
 
     print("=" * 80)
-    print("Simulating episode...")
+    print(f'Simulating episode: {name}')
     print("-" * 80)
 
     while state.category != StateCategory.FINAL:
@@ -391,25 +385,26 @@ def main() -> None:
     state_by_id = {node.id: node_info for node, node_info in zip(nodes, state.node_infos)}
     create_graph_window(nodes, connections, state_by_id)
 
-
-    # Run baseline simulation with the initial policy
+    # Run simulation with random orders 
     # ------------------------------------------------
 
     policy_list = [policy_node_1, policy_node_2, policy_node_3, policy_node_4, policy_node_5]
 
-    simulate_episode(mdp, policy_list, seed=42)
+    simulate_episode(mdp, policy_list, seed=42, name="Random")
 
-    # Initialize PPO Trainer and Train Policy
+    # Run baseline simulation with the initial policy
+    # ------------------------------------------------
+
+    simulate_episode(mdp, policy_list, seed=42, name="Baseline")
+
+    # Run simulation with the trained policy
     # ------------------------------------------------
 
     number_iterations = 50
     trained_policy = train_PPO(mdp, number_iterations=number_iterations)
 
-    # Run simulation with the trained policy
-    # ------------------------------------------------
-
     print("Simulating episode with trained PPO policy...")
-    simulate_episode(mdp, trained_policy, seed=54)
+    simulate_episode(mdp, trained_policy, seed=54, name="PPO")
 
 
 if __name__ == "__main__":
