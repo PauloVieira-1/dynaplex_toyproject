@@ -8,8 +8,10 @@ from numpy.typing import NDArray
 
 from dynaplex.modelling import StateCategory, TrajectoryContext, HorizonType, discover_num_features, Features
 from models.policy import BaseStockPolicy, RandomChoice
-from evaluation.graph import create_graph_window
 from models.PPO import decode_action, encode_action, train_PPO
+from evaluation.record import EpisodeRecorder
+from evaluation.plots import plot_results
+
 
 from helper_functions import *
 
@@ -119,86 +121,32 @@ class SupplyChainMDP:
 
 
     def modify_state_with_action(self, state: SupplyChainState, context: TrajectoryContext, action: int) -> None:
-        """
-        This is called when the agent takes an action. In this case, the action is the order quantity for the current node.
-
-        """
         
-        # abstract these elsewhere later 
-            # assert state.category == StateCategory.AWAIT_ACTION, "Not expecting an action."
-            # assert state.remaining_time > 0, "Simulation finished."
-
+        
         # ---------------------------------------------------------------------------------------------------
 
         # Before, I encoded the single integer action into a list of order quantities for each node. 
         # Now, since we consdier the system sequentially and each node makes its decision one at a time, 
         # we can directly use the action as the order quantity for the current node without encoding/decoding.
 
-        # action_list = decode_action(action, self.action_dims)
+            # action_list = decode_action(action, self.action_dims)
 
         # ---------------------------------------------------------------------------------------------------
+        
+            # Validates the action, then adds the order quantity either into
+            # pending_orders (if the node has upstream suppliers) or directly into the pipeline
+            # or inventory (if it is a source node with infinite supply).
 
 
-        current_node_info: NodeInfo = state.node_infos[state.current_node_index]
-        current_node: Node = self.nodes[state.current_node_index]
-
-        # backorders: int = max(0, -current_node_info.inventory_level) 
-        inventory: int = max(0, current_node_info.inventory_level)
-
-        if action > 0:
-
-            max_order = max(current_node.capacity - inventory, 0)
-            order_qty = min(action, max_order)
-
-            context.cumulative_cost += current_node.order_cost * order_qty
-
-            # Orders always represent a request to upstream now 
-            # In past implementation, if the node had no upstream, the system structure was ignored 
-
-            if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest           
-
-                state.pending_orders[state.current_node_index] = order_qty
-
-            else:
-
-                # if lead_time > 0, items always enter pipeline[-1]
-                # if lead_time == 0, items arrive immediately
-
-                if current_node.lead_time > 0:
-
-                    # Ensure pipeline is the correct length before inserting
-                    while len(current_node_info.pipeline) < current_node.lead_time:
-                        current_node_info.pipeline.append(0)                         
-
-                    # Items enter the back of the pipeline; they arrive after lead_time days
-                    current_node_info.pipeline[-1] += order_qty
-
-                else:
-
-                    # Added capacity cap for zero-lead-time source node 
-                    # no lead time means the items arrive immediately
-                    current_node_info.inventory_level = min(
-                        current_node.capacity,
-                        current_node_info.inventory_level + order_qty
-                    )
+        process_node_order(state, self.nodes, action, context)
 
 
-        # Transition logic might be incorrect? 
-        # Should be checked 
-        # --------------------------------------------------------------------
+        # This function is abstracted out of modify_state_with_action
+        # It sets the state category to either AWAIT_EVENT or AWAIT_ACTION depending on if all nodes have been processed 
 
-        if state.current_node_index < len(self.nodes) - 1:
 
-            state.current_node_index += 1
-            state.category = StateCategory.AWAIT_ACTION
-
-            # print(f"Moving to node {state.current_node_index}.....") 
-
-        else:
-            state.category = StateCategory.AWAIT_EVENT
+        modify_state_category(state, self.nodes)
             
-        # --------------------------------------------------------------------
-
 
     def write_features(self, state: SupplyChainState, features: Features) -> None:
 
@@ -237,10 +185,13 @@ class SupplyChainMDP:
 # Simulation
 # ------------
 
-def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str = "episode") -> None:
+def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str = "episode", recorder: EpisodeRecorder = None) -> None:
     
     context = TrajectoryContext(rng=np.random.default_rng(seed))
     state = mdp.get_initial_state(context)
+
+    if recorder is not None:                                                    
+        recorder.initialise([n.name for n in mdp.nodes])                     
 
     print("=" * 80)
     print(f'Simulating episode: {name}')
@@ -255,6 +206,9 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str =
             mdp.modify_state_with_event(state, context)
             
             print(f"    Post-Event State: {state}")
+
+            if recorder is not None:                                           
+                recorder.record_state(state, context.cumulative_cost)  
 
         elif state.category == StateCategory.AWAIT_ACTION:
             
@@ -278,6 +232,9 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str =
 
             # ------------------------------------------------------------------------
 
+            if recorder is not None:
+                recorder.record_action(current_node_idx, action)
+
             print(f"         Decision for {current_node_name} (Index {current_node_idx}): Order {action}")
 
             mdp.modify_state_with_action(state, context, action)
@@ -288,28 +245,12 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str =
     print("-" * 80)
     print(f"Episode finished. \n Total cost: {context.cumulative_cost:.2f}")
 
+    if recorder is not None:
+        recorder.save()
+
 
 
 def main() -> None:
-
-    # Initialize MDP and Policy
-    # -----------------------
-
-
-    # Generate Visualization
-    # ------------------------------------------------
-
-    state = mdp.get_initial_state(TrajectoryContext(rng=np.random.default_rng(1)))
-
-    nodes = mdp.nodes
-
-    connections = []
-    for node in nodes:
-        for upstream_id in node.upstream_ids:
-            connections.append((next(n for n in nodes if n.id == upstream_id), node))
-
-    state_by_id = {node.id: node_info for node, node_info in zip(nodes, state.node_infos)}
-    create_graph_window(nodes, connections, state_by_id)
 
     # Run simulation with random orders 
     # ------------------------------------------------
@@ -325,10 +266,14 @@ def main() -> None:
         initial_horizon=15,
     )
 
-    simulate_episode(mdp, policy_list, seed=42, name="Random")
+    recorder = EpisodeRecorder("results/random.csv")
+    simulate_episode(mdp, policy_list, seed=42, name="Random", recorder=recorder)
+
+
 
     # Run baseline simulation with the initial policy
     # ------------------------------------------------    
+
     tree = AssemblyTree("config/chain_1.json")
     tree.create_tree_from_json()
     
@@ -340,7 +285,8 @@ def main() -> None:
         initial_horizon=15,
     )
 
-    simulate_episode(mdp_2, policy_list_2, seed=42, name="Assembly Tree")
+    recorder = EpisodeRecorder("results/base_stock.csv")
+    simulate_episode(mdp_2, policy_list_2, seed=42, name="Assembly Tree", recorder=recorder)
 
 
     # Run simulation with the trained policy
@@ -350,7 +296,21 @@ def main() -> None:
     trained_policy = train_PPO(mdp, number_iterations=number_iterations)
 
     print("Simulating episode with trained PPO policy...")
-    simulate_episode(mdp, trained_policy, seed=54, name="PPO")
+
+    recorder = EpisodeRecorder("results/PPO_trained.csv")
+    simulate_episode(mdp, trained_policy, seed=54, name="PPO", recorder=recorder)
+
+
+    # Generate plots of results
+    # ------------------------------------------------
+
+    plot_results(
+        {
+            "Random": "results/random.csv",
+            "Assembly Tree": "results/base_stock.csv",
+            "PPO": "results/PPO_trained.csv",
+        }
+    )
 
 
 

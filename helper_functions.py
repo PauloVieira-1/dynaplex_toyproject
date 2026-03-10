@@ -1,13 +1,16 @@
 from typing import List, Tuple
 from custom_types import SupplyChainState
 from dynaplex.modelling import TrajectoryContext, StateCategory
+from custom_types import Node, NodeInfo
 
+
+
+# Section 1 - Helpers for the modify_state_with_event function
+# -----------------------------------------------------------------------------------------------------------------
 
 
 # This is a work in progress 
 # I am thinking of abstracting some of the other validation and sanity check logic here or into something similaar
-# -----------------------------------------------------------------------------------------------------------------
-
 def assert_state_valid(mdp, state: SupplyChainState):
 
     assert state.category == StateCategory.AWAIT_EVENT, "Not expecting an event right now."
@@ -16,7 +19,6 @@ def assert_state_valid(mdp, state: SupplyChainState):
     assert len(state.pending_orders) == len(mdp.nodes)
     assert state.current_node_index < len(mdp.nodes)
 
-# -----------------------------------------------------------------------------------------------------------------
 
 def advance_all_pipelines(mdp, state: SupplyChainState) -> None:
 
@@ -132,3 +134,75 @@ def update_node_infos_and_costs(mdp, state: SupplyChainState, context: Trajector
 
         context.cumulative_cost += node.holding_cost * inventory
         context.cumulative_cost += node.backlog_cost * backlog
+
+
+# Section 2 - Helpers for the modify_state_with_action function
+# -----------------------------------------------------------------------------------------------------------------
+
+
+def validate_action(action: int, action_dims: List[int]) -> None:
+    assert action >= 0, "Action must be non-negative."
+    assert action < max(action_dims), "Action is out of bounds."
+
+def process_node_order(state: SupplyChainState, nodes: List[Node], action: int, context: TrajectoryContext) -> None:
+
+    validate_action(action, state.action_dims)
+
+    current_node_info: NodeInfo = state.node_infos[state.current_node_index]
+    current_node: Node = nodes[state.current_node_index]
+
+    # backorders: int = max(0, -current_node_info.inventory_level) 
+    inventory: int = max(0, current_node_info.inventory_level)
+
+    if action > 0:
+
+        max_order = max(current_node.capacity - inventory, 0)
+        order_qty = min(action, max_order)
+
+        context.cumulative_cost += current_node.order_cost * order_qty
+
+        # Orders always represent a request to upstream now 
+        # In past implementation, if the node had no upstream, the system structure was ignored 
+
+        if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest           
+
+            state.pending_orders[state.current_node_index] = order_qty
+
+        else:
+
+            # if lead_time > 0, items always enter pipeline[-1]
+            # if lead_time == 0, items arrive immediately
+
+            if current_node.lead_time > 0:
+
+                # Ensure pipeline is the correct length before inserting
+                while len(current_node_info.pipeline) < current_node.lead_time:
+                    current_node_info.pipeline.append(0)                         
+
+                # Items enter the back of the pipeline; they arrive after lead_time days
+                current_node_info.pipeline[-1] += order_qty
+
+            else:
+
+                # Added capacity cap for zero-lead-time source node 
+                # no lead time means the items arrive immediately
+                current_node_info.inventory_level = min(
+                    current_node.capacity,
+                    current_node_info.inventory_level + order_qty
+                )
+
+
+
+
+def modify_state_category(state: SupplyChainState, nodes: List[Node]) -> None:
+    
+
+    if state.current_node_index < len(nodes) - 1:
+
+        state.current_node_index += 1
+        state.category = StateCategory.AWAIT_ACTION
+
+    else:
+        state.category = StateCategory.AWAIT_EVENT
+
+    
