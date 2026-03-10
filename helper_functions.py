@@ -140,13 +140,7 @@ def update_node_infos_and_costs(mdp, state: SupplyChainState, context: Trajector
 # -----------------------------------------------------------------------------------------------------------------
 
 
-def validate_action(action: int, action_dims: List[int]) -> None:
-    assert action >= 0, "Action must be non-negative."
-    assert action < max(action_dims), "Action is out of bounds."
-
 def process_node_order(state: SupplyChainState, nodes: List[Node], action: int, context: TrajectoryContext) -> None:
-
-    validate_action(action, state.action_dims)
 
     current_node_info: NodeInfo = state.node_infos[state.current_node_index]
     current_node: Node = nodes[state.current_node_index]

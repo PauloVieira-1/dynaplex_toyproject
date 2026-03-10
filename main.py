@@ -7,7 +7,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dynaplex.modelling import StateCategory, TrajectoryContext, HorizonType, discover_num_features, Features
-from models.policy import BaseStockPolicy, RandomChoice
 from models.PPO import decode_action, encode_action, train_PPO
 from evaluation.record import EpisodeRecorder
 from evaluation.plots import plot_results

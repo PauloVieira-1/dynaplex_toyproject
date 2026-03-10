@@ -11,6 +11,7 @@ POLICY_CLASS_MAP = {
 }
 
 class AssemblyTree:
+
     def __init__(self, json_file: str):
         
         self.assembly_tree: list[Node] = []
@@ -25,26 +26,9 @@ class AssemblyTree:
     def get_assembly_tree(self) -> list[Node]:
         return self.assembly_tree
 
-    def set_assembly_tree(self, assembly_tree: list[Node]) -> None:
-        self.assembly_tree = assembly_tree
-        self.node_map = {node.id: node for node in assembly_tree}
-
     def get_node_by_id(self, node_id: int) -> Node | None:
         return self.node_map.get(node_id)
 
-    def print_assembly_tree(self) -> None:
-        print("Assembly Tree:")
-
-        for node in self.assembly_tree:
-            print(node)
-
-            if node.id in self.policy_map:
-                policy = self.policy_map[node.id]
-                print(f"  policy -> {policy} (type: {type(policy).__name__})")
-                
-            if hasattr(node, "children"):
-                for child in node.children:
-                    print(f"  child -> {child}")
 
     def create_tree_from_json(self) -> None:
 
@@ -79,6 +63,7 @@ class AssemblyTree:
 
                 if not policy_class:
                     raise ValueError(f"Unknown policy type '{policy_type}' for node '{new_node.name}'")
+                
                 self.policy_map[new_node.id] = policy_class(node=new_node, **policy_kwargs)
 
         self.node_map = {node.id: node for node in self.assembly_tree}
