@@ -59,14 +59,13 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
      
         requested = order_qty
         if requested <= 0:
-            state.pending_orders[i] = 0
             continue
 
         k = len(node.upstream_ids)
         equal_share = requested // k
 
         if equal_share <= 0:
-            state.pending_orders[i] = 0
+            state.pending_orders[i] = requested
             continue
 
         max_share = float('inf')
@@ -74,17 +73,21 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
         for upstream_id in node.upstream_ids:
             upstream_idx = upstream_id - 1  
             upstream_info = state.node_infos[upstream_idx]
+
             available = max(0, upstream_info.inventory_level)   # never use negative inventory
             max_share = min(max_share, available)
+
 
         actual_share = min(equal_share, max_share)
 
         shipped = actual_share * k
         unfulfilled = requested - shipped
 
+
         for upstream_id in node.upstream_ids:
             upstream_idx = upstream_id - 1
             state.node_infos[upstream_idx].inventory_level -= actual_share
+
 
         if node.lead_time > 0:
 
@@ -105,12 +108,10 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             net = info.inventory_level + shipped - unfulfilled
             info.inventory_level = min(net, node.capacity)
 
-        # Reset pending orders
-        state.pending_orders[i] = 0
+        state.pending_orders[i] = unfulfilled
 
 
         
-
 def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
     
     final_node_index = next(i for i, node in enumerate(mdp.nodes) if not node.downstream_ids)
@@ -160,7 +161,7 @@ def process_node_order(state: SupplyChainState, nodes: List[Node], action: int, 
 
         if len(current_node.upstream_ids) > 0: # To distinguish between first node (infinite supply) and rest           
 
-            state.pending_orders[state.current_node_index] = order_qty
+            state.pending_orders[state.current_node_index] += order_qty
 
         else:
 
@@ -198,5 +199,3 @@ def modify_state_category(state: SupplyChainState, nodes: List[Node]) -> None:
 
     else:
         state.category = StateCategory.AWAIT_EVENT
-
-    
