@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from dynaplex.modelling import StateCategory, TrajectoryContext, HorizonType, discover_num_features, Features
-from models.PPO import decode_action, encode_action, train_PPO
+from models.PPO import train_PPO
 from evaluation.record import EpisodeRecorder
 from evaluation.plots import plot_results
 
@@ -28,6 +28,7 @@ class SupplyChainMDP:
     
 
     def __init__(self, nodes: List[Node], initial_horizon: int):
+
 
         # Maybe abstract this into a function later
         # ---------------------------------------------------------------------------------------------
@@ -147,6 +148,10 @@ class SupplyChainMDP:
         modify_state_category(state, self.nodes)
             
 
+    
+    # OPTION 2 - features for all nodes at once
+    # -----------------------------------------------
+
     def write_features(self, state: SupplyChainState, features: Features) -> None:
 
         for node_static, node_dynamic in zip(self.nodes, state.node_infos):
@@ -159,6 +164,28 @@ class SupplyChainMDP:
             features.append(sum(node_dynamic.pipeline) / node_static.capacity)
             
         features.append(state.remaining_time / self.initial_horizon)
+
+
+
+    # OPTION 2 - features for each node
+    # -----------------------------------------------
+
+    # def write_features(self, state: SupplyChainState, features: Features) -> None:
+            
+    #     index_node = state.current_node_index
+    #     node_static = self.nodes[index_node]
+    #     node_dynamic = state.node_infos[index_node]
+
+    #     inventory = max(0, node_dynamic.inventory_level)
+    #     backlog = max(0, -node_dynamic.inventory_level)
+        
+    #     features.append(inventory / node_static.capacity)
+    #     features.append(backlog / node_static.capacity)
+    #     features.append(sum(node_dynamic.pipeline) / node_static.capacity)
+
+    #     features.append(index_node / len(self.nodes))
+    #     features.append(state.remaining_time / self.initial_horizon)
+
 
 
     def write_action_validity(self, state: SupplyChainState, valid: NDArray[np.bool_]) -> None:
@@ -175,6 +202,8 @@ class SupplyChainMDP:
                     valid[action_qty] = True
                 else:                    
                     valid[action_qty] = False
+
+
 
 
 #--------------------------------------------------------------------------------------------------
@@ -285,7 +314,7 @@ def main() -> None:
     )
 
     recorder = EpisodeRecorder("results/base_stock.csv")
-    simulate_episode(mdp_2, policy_list_2, seed=42, name="Assembly Tree", recorder=recorder)
+    simulate_episode(mdp_2, policy_list_2, seed=42, name="Base Stock", recorder=recorder)
 
 
     # Run simulation with the trained policy

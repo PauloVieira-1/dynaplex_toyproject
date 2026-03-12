@@ -1,8 +1,8 @@
-from typing import List
 from dynaplex import PPOTrainerConfig, PPOTrainer
 
 
 """
+
 https://en.wikipedia.org/wiki/Mixed_radix --> Helpful for later 
 
 The encoder takes a list of action quantities (one per node) 
@@ -39,29 +39,29 @@ Final action_quantities = [2, 3, 1]
 
 
 
-def encode_action(order_quantities: List[int], action_dims: List[int]) -> int:
+# def encode_action(order_quantities: List[int], action_dims: List[int]) -> int:
 
-    flat_index = 0
-    multiplier = 1
+#     flat_index = 0
+#     multiplier = 1
 
-    for action, dim in reversed(list(zip(order_quantities, action_dims))):
-        flat_index += action * multiplier
-        multiplier *= dim
+#     for action, dim in reversed(list(zip(order_quantities, action_dims))):
+#         flat_index += action * multiplier
+#         multiplier *= dim
 
-    return flat_index
-
-
-
-def decode_action(action_index: int, action_dims: List[int]) -> List[int]:
-
-    order_quantities = []
-    for dim in reversed(action_dims):
-        order_quantities.append(action_index % dim)
-        action_index //= dim
-    return list(reversed(order_quantities))
+#     return flat_index
 
 
-def train_PPO(mdp, number_iterations=50):
+
+# def decode_action(action_index: int, action_dims: List[int]) -> List[int]:
+
+#     order_quantities = []
+#     for dim in reversed(action_dims):
+#         order_quantities.append(action_index % dim)
+#         action_index //= dim
+#     return list(reversed(order_quantities))
+
+
+def train_PPO(mdp, number_iterations=50, load_policy=False):
 
     config = PPOTrainerConfig(
         seed = 42,
@@ -83,7 +83,6 @@ def train_PPO(mdp, number_iterations=50):
     print(f"-" * 80)
 
     ppo_trainer = PPOTrainer(mdp=mdp, config=config)
-    load_policy = False
 
     if load_policy:
         print("Loading previously trained policy...")

@@ -34,4 +34,5 @@ class PolicyType(Enum):
     MIN_MAX = auto()
     FIXED_ORDER_QUANTITY = auto()
 
+
     

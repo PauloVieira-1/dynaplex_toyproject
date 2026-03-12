@@ -5,5 +5,5 @@ __all__ = [
     "NodeInfo",
     "SupplyChainState",
     "PolicyType",
-    "Node"
+    "Node",
 ]
