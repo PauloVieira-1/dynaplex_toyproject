@@ -53,10 +53,7 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
         # Pending orders for this node (orders placed by this node to its upstream)
         order_qty = state.pending_orders[i]
 
-        # Multi-node system (work in progress) ----> assumes each item from upstream nodes in the same 
-        
-        #-------------------------------------------------------------------
-     
+             
         requested = order_qty
         if requested <= 0:
             continue
@@ -121,7 +118,7 @@ def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> 
     #! Example demand distribution for now (to be chnaged later) 
     # ASML has a pyramid like structure, should be put in a function at later stage 
 
-    demand = context.rng.poisson(lam=5)  
+    demand = context.rng.poisson(lam=5) # To be changed later
     last_node_info.inventory_level -= demand
 
 
