@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List
 from custom_types import SupplyChainState
 from dynaplex.modelling import TrajectoryContext, StateCategory
 from custom_types import Node, NodeInfo
