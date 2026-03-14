@@ -15,29 +15,16 @@ class BasePolicy:
         raise NotImplementedError
 
 
-# Base Stock Policy
+# Base Stock Policy 
 # -------------------
 
 @dataclass
 class BaseStockPolicy(BasePolicy):
 
-    # Default parameters should be adjusted later
+    # Default parameters and should be adjusted later
     target_inventory: int = 50
     safety_stock: int = 10
     price_per_unit: float = 20.0
-
-    def set_parameters(
-        self,
-        target_inventory: int | None = None,
-        safety_stock: int | None = None,
-        price_per_unit: float | None = None,
-    ) -> None:
-        if target_inventory is not None:
-            self.target_inventory = target_inventory
-        if safety_stock is not None:
-            self.safety_stock = safety_stock
-        if price_per_unit is not None:
-            self.price_per_unit = price_per_unit
 
     def get_action(self, node_info) -> int:
 
@@ -65,11 +52,6 @@ class MinMaxPolicy(BasePolicy):
     max_inventory: int = 80
     price_per_unit: float = 20.0
 
-    def set_parameters(self, **kwargs) -> None:
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-
     def get_action(self, node_info) -> int:
 
         total_pending = sum(node_info.pipeline)
@@ -95,15 +77,13 @@ class FixedOrderPolicy(BasePolicy):
     order_quantity: int = 30
     price_per_unit: float = 20.0 # Should be sey by noode (change later)
 
-    def set_parameters(self, **kwargs) -> None:
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-
     def get_action(self, node_info) -> int:
         available_capacity = self.node.capacity - max(0, node_info.inventory_level)
         return int(min(self.order_quantity, max(0, available_capacity)))
 
+
+# Random Choice Policy
+# -------------------
 
 class RandomChoice(BasePolicy):
 
