@@ -115,4 +115,8 @@ class RandomChoice(BasePolicy):
                 setattr(self, key, value)
 
     def get_action(self, node_info) -> int:
-        return rd.randrange(0, self.node.capacity + 1)
+
+        available_capacity = self.node.capacity - max(0, node_info.inventory_level)
+        random_quantity = rd.randrange(0, available_capacity + 1 )
+
+        return random_quantity
