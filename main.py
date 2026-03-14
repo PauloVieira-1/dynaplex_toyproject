@@ -335,7 +335,7 @@ def main() -> None:
     plot_results(
         {
             "Random": "results/random.csv",
-            "Assembly Tree": "results/base_stock.csv",
+            "Base Stock": "results/base_stock.csv",
             "PPO": "results/PPO_trained.csv",
         }
     )
