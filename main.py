@@ -149,20 +149,24 @@ class SupplyChainMDP:
             
 
     
-    # OPTION 2 - features for all nodes at once
+    # OPTION 1 - features for all nodes at once
     # -----------------------------------------------
 
     def write_features(self, state: SupplyChainState, features: Features) -> None:
-
+        max_lt = max(node.lead_time for node in self.nodes)
+        
         for node_static, node_dynamic in zip(self.nodes, state.node_infos):
-
             inventory = max(0, node_dynamic.inventory_level)
             backlog = max(0, -node_dynamic.inventory_level)
-            
             features.append(inventory / node_static.capacity)
             features.append(backlog / node_static.capacity)
-            features.append(sum(node_dynamic.pipeline) / node_static.capacity)
-            
+
+            for s in range(max_lt):
+                val = node_dynamic.pipeline[s] if s < len(node_dynamic.pipeline) else 0
+                features.append(val / node_static.capacity)
+
+
+        features.append(state.current_node_index / len(self.nodes))
         features.append(state.remaining_time / self.initial_horizon)
 
 
@@ -196,7 +200,7 @@ class SupplyChainMDP:
             current_inv = max(0, current_node_dynamic.inventory_level)
             max_order = max(0, current_node_static.capacity - current_inv)
 
-            for action_qty in range(self.num_actions):
+            for action_qty in range(current_node_static.capacity + 1):
 
                 if action_qty <= max_order:
                     valid[action_qty] = True
@@ -291,7 +295,7 @@ def main() -> None:
 
     mdp = SupplyChainMDP(
         nodes = node_list,
-        initial_horizon=15,
+        initial_horizon=25,
     )
 
     recorder = EpisodeRecorder("results/random.csv")
@@ -310,7 +314,7 @@ def main() -> None:
 
     mdp_2 = SupplyChainMDP(
         nodes = node_list_2,
-        initial_horizon=15,
+        initial_horizon=25,
     )
 
     recorder = EpisodeRecorder("results/base_stock.csv")
@@ -320,13 +324,13 @@ def main() -> None:
     # Run simulation with the trained policy
     # ------------------------------------------------
 
-    number_iterations = 50
+    number_iterations = 100
     trained_policy = train_PPO(mdp, number_iterations=number_iterations)
 
     print("Simulating episode with trained PPO policy...")
 
     recorder = EpisodeRecorder("results/PPO_trained.csv")
-    simulate_episode(mdp, trained_policy, seed=54, name="PPO", recorder=recorder)
+    simulate_episode(mdp, trained_policy, seed=42, name="PPO", recorder=recorder)
 
 
     # Generate plots of results

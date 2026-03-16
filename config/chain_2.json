@@ -3,7 +3,7 @@
     {
       "id": 1,
       "name": "Node_1",
-      "capacity": 10,
+      "capacity": 20,
       "holding_cost": 0.2,
       "backlog_cost": 10.0,
       "order_cost": 1.0,
@@ -17,7 +17,7 @@
     {
       "id": 2,
       "name": "Node_2",
-      "capacity": 15,
+      "capacity": 30,
       "holding_cost": 0.5,
       "backlog_cost": 3.0,
       "order_cost": 1.5,
@@ -31,11 +31,11 @@
     {
       "id": 3,
       "name": "Node_3",
-      "capacity": 20,
+      "capacity": 30,
       "holding_cost": 1.0,
       "backlog_cost": 10.0,
       "order_cost": 2.0,
-      "lead_time": 4,
+      "lead_time": 2,
       "upstream_ids": [],
       "downstream_ids": [1],
       "policy": {
@@ -45,11 +45,11 @@
     {
       "id": 4,
       "name": "Node_4",
-      "capacity": 20,
+      "capacity": 30,
       "holding_cost": 1.0,
       "backlog_cost": 3.0,
       "order_cost": 5.0,
-      "lead_time": 3,
+      "lead_time": 2,
       "upstream_ids": [],
       "downstream_ids": [2],
       "policy": {
@@ -59,7 +59,7 @@
     {
       "id": 5,
       "name": "Node_5",
-      "capacity": 20,
+      "capacity": 30,
       "holding_cost": 1.0,
       "backlog_cost": 5.0,
       "order_cost": 2.0,

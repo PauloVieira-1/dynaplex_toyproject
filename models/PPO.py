@@ -64,19 +64,17 @@ Final action_quantities = [2, 3, 1]
 def train_PPO(mdp, number_iterations=50, load_policy=False):
 
     config = PPOTrainerConfig(
-        seed = 42,
-        device = "cpu",
-        hidden_sizes=[64, 64],
-        num_steps= 2 * number_iterations,
-        minibatch_size=64,
-        ent_coef=0.01,
-        gamma=0.99,
-        lr=3e-4,
-        total_timesteps=100000, # Total n. interactions across all iterations
-        logdir=None,  
-        num_envs=8, # Number of parallel environments for data collection 
+        seed=42,
+        device="cpu",
+        hidden_sizes=[128, 128], 
+        num_steps=2048,         
+        minibatch_size=256,     
+        ent_coef=0.05,           
+        gamma=0.99,              
+        lr=1e-4,                
+        total_timesteps=1_000_000, 
+        num_envs=16,             
     )
-
 
 
     print(f"Training PPO with config: {config}")

@@ -27,16 +27,16 @@ def advance_all_pipelines(mdp, state: SupplyChainState) -> None:
 
         if node.lead_time > 0:
 
+
             while len(info.pipeline) < node.lead_time:
                 info.pipeline.append(0)
 
             arrived_today = info.pipeline.pop(0)
             info.inventory_level = min(node.capacity, info.inventory_level + arrived_today)
 
-            while len(info.pipeline) < node.lead_time:
-                info.pipeline.append(0)
+            info.pipeline.append(0)
 
-                
+
 
 def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
     
@@ -58,32 +58,23 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
         if requested <= 0:
             continue
 
-        k = len(node.upstream_ids)
-        equal_share = requested // k
-
-        if equal_share <= 0:
-            state.pending_orders[i] = requested
-            continue
-
-        max_share = float('inf')
-
-        for upstream_id in node.upstream_ids:
-            upstream_idx = upstream_id - 1  
-            upstream_info = state.node_infos[upstream_idx]
-
-            available = max(0, upstream_info.inventory_level)   # never use negative inventory
-            max_share = min(max_share, available)
-
-
-        actual_share = min(equal_share, max_share)
-
-        shipped = actual_share * k
-        unfulfilled = requested - shipped
-
+        available_components = []
 
         for upstream_id in node.upstream_ids:
             upstream_idx = upstream_id - 1
-            state.node_infos[upstream_idx].inventory_level -= actual_share
+            upstream_info = state.node_infos[upstream_idx]
+
+            available = max(0, upstream_info.inventory_level)
+            available_components.append(available)
+
+        assembled = min(min(available_components), requested)
+
+        # Remove components from upstream inventories
+        for upstream_id in node.upstream_ids:
+            upstream_idx = upstream_id - 1
+            state.node_infos[upstream_idx].inventory_level -= assembled
+
+        unfulfilled = requested - assembled
 
 
         if node.lead_time > 0:
@@ -96,14 +87,15 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             
             '''
 
-            info.pipeline[-1] += shipped
+            info.pipeline[0] += assembled
             info.inventory_level -= unfulfilled
 
         else:
 
             # Immediate arrival for zero lead time
-            net = info.inventory_level + shipped - unfulfilled
+            net = info.inventory_level + assembled - unfulfilled
             info.inventory_level = min(net, node.capacity)
+
 
         state.pending_orders[i] = unfulfilled
 
@@ -114,11 +106,11 @@ def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> 
     final_node_index = next(i for i, node in enumerate(mdp.nodes) if not node.downstream_ids)
     last_node_info = state.node_infos[final_node_index]
 
+    #! Example demand distribution for now (to be changed later)
+    # ASML has a pyramid like structure, should be put in a function at later stage
 
-    #! Example demand distribution for now (to be chnaged later) 
-    # ASML has a pyramid like structure, should be put in a function at later stage 
+    demand = context.rng.poisson(lam=2)
 
-    demand = context.rng.poisson(lam=5) # To be changed later
     last_node_info.inventory_level -= demand
 
 
