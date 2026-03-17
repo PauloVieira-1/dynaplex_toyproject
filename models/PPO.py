@@ -73,7 +73,7 @@ def train_PPO(mdp, number_iterations=50, load_policy=False):
         gamma=0.99,              
         lr=1e-4,                
         total_timesteps=1_000_000, 
-        num_envs=16,             
+        num_envs=16,    
     )
 
 
