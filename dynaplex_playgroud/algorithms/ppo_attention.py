@@ -16,8 +16,8 @@ import numpy as np
 import torch
 from torch.optim import Adam
 
-from data.sequence_model import SequenceBuilder
-from networks.transformer_networks import (
+from dynaplex_playgroud.data.sequence_model import SequenceBuilder
+from dynaplex_playgroud.networks.transformer_networks import (
     TransformerPolicyNet,
     TransformerValueNet,
     build_transformer_policy_net,

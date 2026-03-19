@@ -4,7 +4,6 @@ from dynaplex.modelling import TrajectoryContext, StateCategory
 from custom_types import Node, NodeInfo
 
 
-
 # Section 1 - Helpers for the modify_state_with_event function
 # -----------------------------------------------------------------------------------------------------------------
 
@@ -14,7 +13,7 @@ from custom_types import Node, NodeInfo
 def assert_state_valid(mdp, state: SupplyChainState):
 
     assert state.category == StateCategory.AWAIT_EVENT, "Not expecting an event right now."
-    assert state.remaining_time > 0, "Simulation already finished."
+    assert state.remaining_time > 0, "Remaining time must be positive."
     assert len(state.node_infos) == len(mdp.nodes), "State node infos length mismatch with number of nodes."
     assert len(state.pending_orders) == len(mdp.nodes)
     assert state.current_node_index < len(mdp.nodes)
@@ -27,7 +26,6 @@ def advance_all_pipelines(mdp, state: SupplyChainState) -> None:
 
         if node.lead_time > 0:
 
-
             while len(info.pipeline) < node.lead_time:
                 info.pipeline.append(0)
 
@@ -37,11 +35,9 @@ def advance_all_pipelines(mdp, state: SupplyChainState) -> None:
             info.pipeline.append(0)
 
 
-
 def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
     
     # Iterate in reverse so upstream nodes fulfill orders before downstream nodes
-    
     for i in reversed(range(len(mdp.nodes))):
         node = mdp.nodes[i]
         info = state.node_infos[i]
@@ -53,7 +49,6 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
         # Pending orders for this node (orders placed by this node to its upstream)
         order_qty = state.pending_orders[i]
 
-             
         requested = order_qty
         if requested <= 0:
             continue
@@ -76,7 +71,6 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
 
         unfulfilled = requested - assembled
 
-
         if node.lead_time > 0:
 
             '''
@@ -84,7 +78,6 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
 
                 pipeline[0] = 3 means 3 units arrive tomorrow
                 pipeline[1] = 5 means 5 units arrive in 2 days
-            
             '''
 
             info.pipeline[0] += assembled
@@ -96,11 +89,9 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             net = info.inventory_level + assembled - unfulfilled
             info.inventory_level = min(net, node.capacity)
 
-
         state.pending_orders[i] = unfulfilled
 
 
-        
 def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
     
     final_node_index = next(i for i, node in enumerate(mdp.nodes) if not node.downstream_ids)
@@ -110,9 +101,7 @@ def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> 
     # ASML has a pyramid like structure, should be put in a function at later stage
 
     demand = context.rng.poisson(lam=2)
-
     last_node_info.inventory_level -= demand
-
 
 
 def update_node_infos_and_costs(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
@@ -176,11 +165,8 @@ def process_node_order(state: SupplyChainState, nodes: List[Node], action: int, 
                 )
 
 
-
-
 def modify_state_category(state: SupplyChainState, nodes: List[Node]) -> None:
     
-
     if state.current_node_index < len(nodes) - 1:
 
         state.current_node_index += 1
@@ -188,3 +174,9 @@ def modify_state_category(state: SupplyChainState, nodes: List[Node]) -> None:
 
     else:
         state.category = StateCategory.AWAIT_EVENT
+
+def get_max_simulation_iterations():
+    return 500
+
+def get_max_training_iterations():
+    return 100

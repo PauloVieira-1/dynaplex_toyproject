@@ -31,7 +31,7 @@ from enum import Enum
 
 import torch
 
-from data.action_base import Action, OrderedList
+from dynaplex_playgroud.data.action_base import Action, OrderedList
 
 
 # ============================================================================

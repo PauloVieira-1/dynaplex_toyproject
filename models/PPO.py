@@ -61,20 +61,24 @@ Final action_quantities = [2, 3, 1]
 #     return list(reversed(order_quantities))
 
 
-def train_PPO(mdp, number_iterations=50, load_policy=False):
+def train_PPO(mdp, load_policy=False, total_timesteps=500000):
 
     config = PPOTrainerConfig(
-        seed=42,
-        device="cpu",
-        hidden_sizes=[128, 128], 
-        num_steps=2048,         
-        minibatch_size=256,     
-        ent_coef=0.05,           
-        gamma=0.99,              
-        lr=1e-4,                
-        total_timesteps=1_000_000, 
-        num_envs=16,    
-    )
+            seed=42,
+            device="cpu",
+            hidden_sizes=[256, 256, 128], 
+            num_steps=2048,         
+            minibatch_size=512,    
+            lr=3e-4,                
+            anneal_lr=True, 
+            ent_coef=0.01,           
+            gamma=0.99,
+            gae_lambda=0.95, 
+            total_timesteps=total_timesteps, 
+            num_envs=16,
+            max_grad_norm=0.5,
+            norm_adv=True,     
+        )
 
 
     print(f"Training PPO with config: {config}")

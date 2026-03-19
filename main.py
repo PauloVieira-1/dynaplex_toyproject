@@ -1,235 +1,46 @@
 from __future__ import annotations
-from dataclasses import dataclass
 from typing import List
-from custom_types import SupplyChainState, NodeInfo, Node
-
+from custom_types import SupplyChainState
+from custom_types.custom_types import ReorderAction
+import copy
 import numpy as np
-from numpy.typing import NDArray
-
-from dynaplex.modelling import StateCategory, TrajectoryContext, HorizonType, discover_num_features, Features
+from dynaplex.modelling import StateCategory, TrajectoryContext
+from models.attention_PPO import train_attention_PPO
 from models.PPO import train_PPO
 from evaluation.record import EpisodeRecorder
 from evaluation.plots import plot_results
-
-
 from helper_functions import *
-
 from assembly_tree import AssemblyTree
-
-@dataclass(slots=True)
-class SupplyChainMDP:
-
-    nodes: List[Node]
-    initial_horizon: int
-    horizon_type: HorizonType
-    num_features: int
-    num_actions: int
-    action_dims: List[int]
-    
-
-    def __init__(self, nodes: List[Node], initial_horizon: int):
-
-
-        # Maybe abstract this into a function later
-        # ---------------------------------------------------------------------------------------------
-        
-        assert len(nodes) > 0, "Supply chain must have at least one node."
-        assert initial_horizon > 0, "Initial horizon must be positive."
-        assert all(node.capacity > 0 for node in nodes), "All nodes must have positive capacity."
-        assert all(node.holding_cost >= 0 for node in nodes), "All nodes must have non-negative holding cost."
-        assert all(node.backlog_cost >= 0 for node in nodes), "All nodes must have non-negative backlog cost."
-        assert all(node.order_cost >= 0 for node in nodes), "All nodes must have non-negative order cost."
-        assert all(node.lead_time >= 0 for node in nodes), "All nodes must have non-negative lead time."
-
-        # ---------------------------------------------------------------------------------------------
-
-        self.nodes = nodes
-        self.initial_horizon = initial_horizon
-        self.horizon_type = HorizonType.FINITE # should work on making infinite 
-
-
-        self.action_dims = [node.capacity + 1 for node in nodes] # Each node can order from 0 up to its capacity
-
-        # Max possible actions for any single node. 
-        # Maximum because the PPO output layer needs to accommodate the largest action space among the nodes, even if some nodes have smaller action spaces
-        self.num_actions = max(node.capacity for node in nodes) + 1 
-
-        self.num_features = discover_num_features(self)
-
-
-
-    def get_initial_state(self, context: TrajectoryContext) -> SupplyChainState:
-        
-        node_infos = []
-        
-        for node in self.nodes:
-            node_infos.append(
-                NodeInfo(
-                    inventory_level=node.capacity // 2, # initially half full
-                    pipeline=[0 for _ in range(node.lead_time)],
-                )
-            )
-
-        return SupplyChainState(
-            node_infos=node_infos,
-            remaining_time=self.initial_horizon,
-            day=0,
-            category=StateCategory.AWAIT_ACTION, 
-            current_node_index=0,
-            pending_orders=[0 for x in self.nodes],
-        )
-
-
-    def modify_state_with_event(self, state: SupplyChainState, context: TrajectoryContext) -> None:
-        """
-        This is a function that modifies the state of the supply chain based on the current event, which is the arrival of an order.
-        """
-
-        # I decided to abstract each "step" into a functions in helper_functions.py because modify_state_with_event grew far too big 
-        # I will possibly be doing the same for modify_state_with_action
-
-        advance_all_pipelines(self, state) # The functionality to advance the pipeline for all nodes has been abstracted here 
-
-        fulfill_upstream_orders(self, state)
-
-        process_demand(self, state, context)
-
-        update_node_infos_and_costs(self, state, context)
-
-        assert_state_valid(self, state)
-
-
-        # ----------------------------------------------------------------------------------------
-        # Reset to first node for next day 
-        # This happens once only after all nodes have processed daily events 
-
-        # I am not sure how something like this would work in an infinite system 
-
-        state.current_node_index = 0
-        state.day += 1
-        state.remaining_time -= 1
-
-        # -----------------------------------------------------------------------------------------------
-
-
-        if state.remaining_time <= 0:
-            state.category = StateCategory.FINAL
-
-        else:
-            state.category = StateCategory.AWAIT_ACTION
-
-
-
-    def modify_state_with_action(self, state: SupplyChainState, context: TrajectoryContext, action: int) -> None:
-        
-        
-        # ---------------------------------------------------------------------------------------------------
-
-        # Before, I encoded the single integer action into a list of order quantities for each node. 
-        # Now, since we consdier the system sequentially and each node makes its decision one at a time, 
-        # we can directly use the action as the order quantity for the current node without encoding/decoding.
-
-            # action_list = decode_action(action, self.action_dims)
-
-        # ---------------------------------------------------------------------------------------------------
-        
-            # Validates the action, then adds the order quantity either into
-            # pending_orders (if the node has upstream suppliers) or directly into the pipeline
-            # or inventory (if it is a source node with infinite supply).
-
-
-        process_node_order(state, self.nodes, action, context)
-
-
-        # This function is abstracted out of modify_state_with_action
-        # It sets the state category to either AWAIT_EVENT or AWAIT_ACTION depending on if all nodes have been processed 
-
-
-        modify_state_category(state, self.nodes)
-            
-
-    
-    # OPTION 1 - features for all nodes at once
-    # -----------------------------------------------
-
-    def write_features(self, state: SupplyChainState, features: Features) -> None:
-        max_lt = max(node.lead_time for node in self.nodes)
-        
-        for node_static, node_dynamic in zip(self.nodes, state.node_infos):
-            inventory = max(0, node_dynamic.inventory_level)
-            backlog = max(0, -node_dynamic.inventory_level)
-            features.append(inventory / node_static.capacity)
-            features.append(backlog / node_static.capacity)
-
-            for s in range(max_lt):
-                val = node_dynamic.pipeline[s] if s < len(node_dynamic.pipeline) else 0
-                features.append(val / node_static.capacity)
-
-
-        features.append(state.current_node_index / len(self.nodes))
-        features.append(state.remaining_time / self.initial_horizon)
-
-
-
-    # OPTION 2 - features for each node
-    # -----------------------------------------------
-
-    # def write_features(self, state: SupplyChainState, features: Features) -> None:
-            
-    #     index_node = state.current_node_index
-    #     node_static = self.nodes[index_node]
-    #     node_dynamic = state.node_infos[index_node]
-
-    #     inventory = max(0, node_dynamic.inventory_level)
-    #     backlog = max(0, -node_dynamic.inventory_level)
-        
-    #     features.append(inventory / node_static.capacity)
-    #     features.append(backlog / node_static.capacity)
-    #     features.append(sum(node_dynamic.pipeline) / node_static.capacity)
-
-    #     features.append(index_node / len(self.nodes))
-    #     features.append(state.remaining_time / self.initial_horizon)
-
-
-
-    def write_action_validity(self, state: SupplyChainState, valid: NDArray[np.bool_]) -> None:
-
-            current_node_static: Node = self.nodes[state.current_node_index]
-            current_node_dynamic: NodeInfo = state.node_infos[state.current_node_index]
-
-            current_inv = max(0, current_node_dynamic.inventory_level)
-            max_order = max(0, current_node_static.capacity - current_inv)
-
-            for action_qty in range(current_node_static.capacity + 1):
-
-                if action_qty <= max_order:
-                    valid[action_qty] = True
-                else:                    
-                    valid[action_qty] = False
-
-
-
-
-#--------------------------------------------------------------------------------------------------
-
+from mdp_assembly import SupplyChainMDP
+from helper_functions import get_max_simulation_iterations, get_max_training_iterations
 
 
 # Simulation
 # ------------
 
-def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str = "episode", recorder: EpisodeRecorder = None) -> None:
+def simulate_episode(mdp: SupplyChainMDP, policy, seed: int = 50, name: str = "episode", recorder: EpisodeRecorder = None,
+    initial_state: SupplyChainState = None,
+    max_steps: int = None
+) -> None:
     
     context = TrajectoryContext(rng=np.random.default_rng(seed))
-    state = mdp.get_initial_state(context)
+    state = initial_state if initial_state is not None else mdp.get_initial_state(context)
+
+    if max_steps is None:
+        max_steps = mdp.initial_horizon
 
     if recorder is not None:                                                    
-        recorder.initialise([n.name for n in mdp.nodes])                     
+        recorder.initialise([n.name for n in mdp.nodes])        
+
 
     print("=" * 80)
     print(f'Simulating episode: {name}')
     print("-" * 80)
 
-    while state.category != StateCategory.FINAL:
+
+    steps = 0
+
+    while state.category != StateCategory.FINAL and steps < max_steps:
 
         if state.category == StateCategory.AWAIT_EVENT:
 
@@ -260,7 +71,12 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str =
                 action = current_node_policy.get_action(current_node_info)
 
             else:
-                action = policy.get_action(state)
+                if hasattr(policy, "get_action"):
+                    action = policy.get_action(state)
+                elif callable(policy):
+                    action = policy(state)
+                else:
+                    raise TypeError("Policy must be callable or have get_action()")
 
             # ------------------------------------------------------------------------
 
@@ -273,6 +89,11 @@ def simulate_episode(mdp: SupplyChainMDP, policy, *, seed: int = 42, name: str =
 
         else:
             raise RuntimeError(f"Unexpected state category: {state.category}")
+
+        steps += 1
+
+    if steps >= max_steps:
+        print(f"Episode truncated at day {state.day} after reaching max_steps={max_steps}")
 
     print("-" * 80)
     print(f"Episode finished. \n Total cost: {context.cumulative_cost:.2f}")
@@ -295,11 +116,11 @@ def main() -> None:
 
     mdp = SupplyChainMDP(
         nodes = node_list,
-        initial_horizon=25,
+        initial_horizon=get_max_simulation_iterations(),
     )
 
     recorder = EpisodeRecorder("results/random.csv")
-    simulate_episode(mdp, policy_list, seed=42, name="Random", recorder=recorder)
+    simulate_episode(mdp, policy_list, seed=50, name="Random", recorder=recorder, max_steps=get_max_simulation_iterations())
 
 
 
@@ -314,23 +135,68 @@ def main() -> None:
 
     mdp_2 = SupplyChainMDP(
         nodes = node_list_2,
-        initial_horizon=25,
+        initial_horizon=get_max_simulation_iterations(),
     )
 
     recorder = EpisodeRecorder("results/base_stock.csv")
-    simulate_episode(mdp_2, policy_list_2, seed=42, name="Base Stock", recorder=recorder)
+    simulate_episode(mdp_2, policy_list_2, seed=50, name="Base Stock", recorder=recorder, max_steps=get_max_simulation_iterations())
 
 
-    # Run simulation with the trained policy
+    # Run simulation with the trained PPO policy
     # ------------------------------------------------
 
-    number_iterations = 100
-    trained_policy = train_PPO(mdp, number_iterations=number_iterations)
+    number_iterations = get_max_training_iterations()
+    trained_policy = train_PPO(mdp, load_policy=True, total_timesteps=number_iterations)
 
     print("Simulating episode with trained PPO policy...")
 
     recorder = EpisodeRecorder("results/PPO_trained.csv")
-    simulate_episode(mdp, trained_policy, seed=42, name="PPO", recorder=recorder)
+    simulate_episode(mdp, trained_policy, seed=50, name="PPO", recorder=recorder, max_steps=get_max_simulation_iterations())
+
+
+    # Run simulation with trained Attention policy
+    # ------------------------------------------------
+
+    reorder_actions = [
+        ReorderAction(order_quantity=q)
+        for q in range(mdp.num_actions) 
+    ]
+
+    max_demand = 6
+
+    trained_policy = train_attention_PPO(
+        mdp,
+        number_iterations=get_max_training_iterations(),
+        reorder_actions=reorder_actions,
+        max_demand=max_demand, 
+        node_infos=[copy.deepcopy(node_info) for node_info in mdp.get_initial_state(
+            TrajectoryContext(rng=np.random.default_rng(50))
+        ).node_infos]
+    )
+
+    print("Simulating episode with trained Attention policy...")
+
+    recorder = EpisodeRecorder("results/attention_trained.csv")
+    initial_ctx = TrajectoryContext(rng=np.random.default_rng(50))
+
+    initial_state = SupplyChainState(
+        node_infos=[copy.deepcopy(n) for n in mdp.get_initial_state(initial_ctx).node_infos],
+        remaining_time=get_max_simulation_iterations(),
+        day=0,
+        category=StateCategory.AWAIT_ACTION,
+        current_node_index=0,
+        pending_orders=[0 for _ in mdp.nodes],
+    )
+
+    simulate_episode(
+        mdp,
+        trained_policy,
+        seed=50,
+        name="Attention", 
+        recorder=recorder,
+        initial_state=initial_state,
+        max_steps=get_max_simulation_iterations()
+    )
 
 
     # Generate plots of results
@@ -341,6 +207,7 @@ def main() -> None:
             "Random": "results/random.csv",
             "Base Stock": "results/base_stock.csv",
             "PPO": "results/PPO_trained.csv",
+            "Attention": "results/attention_trained.csv",
         }
     )
 
