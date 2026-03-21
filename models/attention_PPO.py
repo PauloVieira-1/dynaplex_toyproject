@@ -52,9 +52,8 @@ class SCGlobalState(GlobalState):
 
 def _node_to_feature(node_static, node_dynamic) -> NodeFeature:
 
-    """Convert a single node's static + dynamic info into a fixed NodeFeature object.
-
-    Pipeline slots beyond the node's actual lead time are padded with 0.0.
+    """
+    Convert a single node's static + dynamic info into a NodeFeature object.
 
     """
 
@@ -88,7 +87,7 @@ def build_action_set(state: SupplyChainState, mdp: SupplyChainMDP) -> ActionSet:
     
     """
 
-    # Q (Query) comes from the global state 
+    # Q (Query) comes from the global state ??
     global_state = SCGlobalState(
         current_node_index=state.current_node_index / len(mdp.nodes),
         remaining_time=state.remaining_time / mdp.initial_horizon,
@@ -106,8 +105,8 @@ def build_action_set(state: SupplyChainState, mdp: SupplyChainMDP) -> ActionSet:
     current_inventory = max(0, node_dynamic.inventory_level)
     max_order = max(0, node_static.capacity - current_inventory)
 
-    # K (Key) comes from the action nodes
-    # V is not explicit but is computed inside the trasformer 
+    # K (Key) comes from the action nodes??
+    # V is not explicit but is computed inside the trasformer ??
     graph_actions = [GraphAction(order_quantity=q) for q in range(max_order + 1)]
 
     if not graph_actions:
