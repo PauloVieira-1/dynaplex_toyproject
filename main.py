@@ -12,7 +12,7 @@ from evaluation.plots import plot_results
 from helper_functions import *
 from assembly_tree import AssemblyTree
 from mdp_assembly import SupplyChainMDP
-from helper_functions import get_max_simulation_iterations, get_max_training_iterations
+from helper_functions import get_max_simulation_iterations, get_attention_training_episodes, get_ppo_training_timesteps
 
 
 # Simulation
@@ -145,8 +145,8 @@ def main() -> None:
     # Run simulation with the trained PPO policy
     # ------------------------------------------------
 
-    number_iterations = get_max_training_iterations()
-    trained_policy = train_PPO(mdp, load_policy=True, total_timesteps=number_iterations)
+    number_iterations = get_ppo_training_timesteps()
+    trained_policy = train_PPO(mdp, load_policy=False, total_timesteps=number_iterations)
 
     print("Simulating episode with trained PPO policy...")
 
@@ -166,7 +166,8 @@ def main() -> None:
 
     trained_policy = train_attention_PPO(
         mdp,
-        number_iterations=get_max_training_iterations(),
+        number_iterations=get_attention_training_episodes(),
+        max_steps=get_max_simulation_iterations(),
         reorder_actions=reorder_actions,
         max_demand=max_demand, 
         node_infos=[copy.deepcopy(node_info) for node_info in mdp.get_initial_state(

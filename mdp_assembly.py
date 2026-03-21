@@ -139,16 +139,16 @@ class SupplyChainMDP:
     def write_features(self, state: SupplyChainState, features: Features) -> None:
         max_lt = max(node.lead_time for node in self.nodes)
         
-        for node_static, node_dynamic in zip(self.nodes, state.node_infos):
+        for node_static, node_dynamic, pending in zip(self.nodes, state.node_infos, state.pending_orders):
             inventory = max(0, node_dynamic.inventory_level)
             backlog = max(0, -node_dynamic.inventory_level)
             features.append(inventory / node_static.capacity)
             features.append(backlog / node_static.capacity)
+            features.append(pending / node_static.capacity) 
 
             for s in range(max_lt):
                 val = node_dynamic.pipeline[s] if s < len(node_dynamic.pipeline) else 0
                 features.append(val / node_static.capacity)
-
 
         features.append(state.current_node_index / len(self.nodes))
         features.append(state.remaining_time / self.initial_horizon)

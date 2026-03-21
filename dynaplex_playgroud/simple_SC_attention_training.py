@@ -79,7 +79,7 @@ def _make_step_fn(mdp: SupplyChainMDP, reorder_actions: list[ReorderAction], max
         done = False
         return next_state, float(ctx.cumulative_cost), done
 
-    return step_env
+    return step_env 
 
 
 # ============================================================================

@@ -130,7 +130,7 @@ def evaluate_policy_multinode(
 
         state = SupplyChainState(
             node_infos=copy.deepcopy(node_infos),
-            remaining_time=1000,
+            remaining_time=num_steps,
             day=0,
             category=StateCategory.AWAIT_ACTION,
             current_node_index=0,
@@ -161,7 +161,8 @@ def evaluate_policy_multinode(
 
 # ============================================================================
 
-def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, reorder_actions: List[ReorderAction], max_demand: int, node_infos: List[NodeInfo]):
+def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
+                         reorder_actions: List[ReorderAction], max_demand: int, node_infos: List[NodeInfo]):
 
     config = AttentionPPOConfig(
         num_episodes=number_iterations,
@@ -173,7 +174,7 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, reorder_act
         d_model=64,
         nhead=4,
         num_layers=2,
-        max_steps_per_episode=50,
+        max_steps_per_episode=number_iterations,
         seed=123,
         log_every=10,
         ppo_epochs=4,
@@ -186,6 +187,8 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, reorder_act
 
         def step_env(state, action_key: int, rng):
 
+
+            # Deep copy was not working so im doing a shallow copy
             next_state = SupplyChainState(
                 node_infos=[
                     NodeInfo(
@@ -200,13 +203,16 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, reorder_act
                 current_node_index=state.current_node_index,
                 pending_orders=list(state.pending_orders),
             )
+
             ctx = TrajectoryContext(rng=rng, cumulative_cost=0.0, time_elapsed=0)
 
             mdp.modify_state_with_action(next_state, ctx, action_key)
 
+            # If statement to check if the next state is an event but not really necessary
             if next_state.category == StateCategory.AWAIT_EVENT:
                 mdp.modify_state_with_event(next_state, ctx)
 
+            # Not infinite horizon, done when we reach the final state
             done = next_state.category == StateCategory.FINAL
             return next_state, float(ctx.cumulative_cost), done
 
@@ -249,6 +255,6 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, reorder_act
             action_to_key=_action_to_key,
         )
 
-    evaluate_policy_multinode("Attention PPO", mdp, learned_selector, node_infos)
+    evaluate_policy_multinode("Attention PPO", mdp,learned_selector, node_infos, max_steps)
 
     return learned_selector

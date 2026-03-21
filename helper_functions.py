@@ -81,15 +81,13 @@ def fulfill_upstream_orders(mdp, state: SupplyChainState) -> None:
             '''
 
             info.pipeline[0] += assembled
-            info.inventory_level -= unfulfilled
-
         else:
+            info.inventory_level = min(
+                info.inventory_level + assembled,
+                node.capacity
+            )
 
-            # Immediate arrival for zero lead time
-            net = info.inventory_level + assembled - unfulfilled
-            info.inventory_level = min(net, node.capacity)
-
-        state.pending_orders[i] = unfulfilled
+        state.pending_orders[i] = unfulfilled  # handles the remainder
 
 
 def process_demand(mdp, state: SupplyChainState, context: TrajectoryContext) -> None:
@@ -176,7 +174,10 @@ def modify_state_category(state: SupplyChainState, nodes: List[Node]) -> None:
         state.category = StateCategory.AWAIT_EVENT
 
 def get_max_simulation_iterations():
-    return 500
+    return 700
 
-def get_max_training_iterations():
-    return 100
+def get_ppo_training_timesteps():
+    return 1_000_000 # environment steps
+
+def get_attention_training_episodes():
+    return 500       # episodes × 16 envs × 500 steps = 4M steps
