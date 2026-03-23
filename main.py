@@ -5,7 +5,7 @@ from custom_types.custom_types import ReorderAction
 import copy
 import numpy as np
 from dynaplex.modelling import StateCategory, TrajectoryContext
-from models.attention_PPO import train_attention_PPO
+from models.attention_PPO import train_attention
 from models.PPO import train_PPO
 from evaluation.record import EpisodeRecorder
 from evaluation.plots import plot_results
@@ -145,13 +145,13 @@ def main() -> None:
     # Run simulation with the trained PPO policy
     # ------------------------------------------------
 
-    number_iterations = get_ppo_training_timesteps()
-    trained_policy = train_PPO(mdp, load_policy=False, total_timesteps=number_iterations)
+    # number_iterations = get_ppo_training_timesteps()
+    # trained_policy = train_PPO(mdp, load_policy=False, total_timesteps=number_iterations)
 
-    print("Simulating episode with trained PPO policy...")
+    # print("Simulating episode with trained PPO policy...")
 
-    recorder = EpisodeRecorder("results/PPO_trained.csv")
-    simulate_episode(mdp, trained_policy, seed=50, name="PPO", recorder=recorder, max_steps=get_max_simulation_iterations())
+    # recorder = EpisodeRecorder("results/PPO_trained.csv")
+    # simulate_episode(mdp, trained_policy, seed=50, name="PPO", recorder=recorder, max_steps=get_max_simulation_iterations())
 
 
     # Run simulation with trained Attention policy
@@ -164,7 +164,7 @@ def main() -> None:
 
     max_demand = 6
 
-    trained_policy = train_attention_PPO(
+    trained_policy = train_attention(
         mdp,
         number_iterations=get_attention_training_episodes(),
         max_steps=get_max_simulation_iterations(),

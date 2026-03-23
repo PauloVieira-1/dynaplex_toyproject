@@ -1,4 +1,4 @@
-from custom_types.custom_types import ReorderAction, SupplyChainState, NodeInfo, SCGlobalState, GraphAction
+from custom_types.custom_types import ReorderAction, SupplyChainState, NodeInfo, GraphAction
 import copy
 from mdp_assembly import SupplyChainMDP  
 from dynaplex.modelling import TrajectoryContext, StateCategory
@@ -24,24 +24,26 @@ except Exception:
     USE_DYNAPLEX_ADAPTER = False
 
 
-MAX_PIPELINE_LENGTH = 5
-
-@dataclass(slots=True)
-class ActionSet:
-    global_state: SCGlobalState   # the local one with NodeFeature
-    actions: list[GraphAction]
-
+# ----------------------------------------
+# Allows the attention to see 5 pipeline slots at once 
+# Extra orders are ignored
 @dataclass(slots=True)
 class NodeFeature(GlobalState):
     inventory: float
     backlog: float
+    pending: float
     pl_0: float
     pl_1: float
     pl_2: float
     pl_3: float
     pl_4: float
 
+# ----------------------------------------
 
+
+# ----------------------------------------
+
+# The global state is different than for the other models
 @dataclass(slots=True)
 class SCGlobalState(GlobalState):
     current_node_index: float
@@ -49,33 +51,60 @@ class SCGlobalState(GlobalState):
     category: StateCategory
     nodes: list[NodeFeature]
 
+# Other modesl:
 
-def _node_to_feature(node_static, node_dynamic) -> NodeFeature:
+@dataclass(slots=True)
+class SupplyChainState:
+    
+    node_infos: List[NodeInfo]
+    day: int
+    category: StateCategory
+    current_node_index: int
+    remaining_time: int
+    pending_orders: List[int]  # This can grow up to len(mdp.nodes)
+
+# ----------------------------------------
+
+
+
+
+MAX_PIPELINE_LENGTH = 5
+
+@dataclass(slots=True)
+class ActionSet:
+    global_state: SCGlobalState   
+    actions: list[GraphAction]
+
+
+
+def _node_to_feature(node_static, node_dynamic, pending: float) -> NodeFeature: 
 
     """
-    Convert a single node's static + dynamic info into a NodeFeature object.
+    Convert a single node's static + dynamic info into a single NodeFeature object.
 
     """
-
+    
     inventory = max(0, node_dynamic.inventory_level) / node_static.capacity
     backlog = max(0, -node_dynamic.inventory_level) / node_static.capacity
 
     pipeline_slots = []
-
     for s in range(MAX_PIPELINE_LENGTH):
-
         val = node_dynamic.pipeline[s] if s < len(node_dynamic.pipeline) else 0
         pipeline_slots.append(val / node_static.capacity)
 
+    # pending = pending / node_static.capacity
     return NodeFeature(
         inventory=inventory,
         backlog=backlog,
+        pending=pending / node_static.capacity,  
         pl_0=pipeline_slots[0],
         pl_1=pipeline_slots[1],
         pl_2=pipeline_slots[2],
         pl_3=pipeline_slots[3],
         pl_4=pipeline_slots[4],
     )
+
+
 
 
 def build_action_set(state: SupplyChainState, mdp: SupplyChainMDP) -> ActionSet:
@@ -93,8 +122,8 @@ def build_action_set(state: SupplyChainState, mdp: SupplyChainMDP) -> ActionSet:
         remaining_time=state.remaining_time / mdp.initial_horizon,
         category=state.category,
         nodes=[
-            _node_to_feature(node_static, node_dynamic)
-            for node_static, node_dynamic in zip(mdp.nodes, state.node_infos)
+            _node_to_feature(node_static, node_dynamic, pending)
+            for node_static, node_dynamic, pending in zip(mdp.nodes, state.node_infos, state.pending_orders)
         ],
     )
 
@@ -142,25 +171,28 @@ def evaluate_policy_multinode(
                 break
 
             act = action_selector(state)
+
+            # WHy did you choose to do one step costs instead of cumulative costs?
             ctx = TrajectoryContext(rng=rng, cumulative_cost=0.0, time_elapsed=0)
             mdp.modify_state_with_action(state, ctx, act)
 
             if state.category == StateCategory.AWAIT_EVENT:
                 mdp.modify_state_with_event(state, ctx)
 
-            total_cost += ctx.cumulative_cost # no one step cost in this case becasue multiple nodes are involved
+            total_cost += ctx.cumulative_cost
 
         costs.append(total_cost)
 
     avg = np.mean(costs)
     lo, hi = np.min(costs), np.max(costs)
+    
     print(f"{name:30s} avg_cost={avg:7.2f}  min={lo:.2f}  max={hi:.2f}  ({num_seeds} seeds)")
 
 
 
-# ============================================================================
+# ---------------------------------------------------------------------------------------------------------------
 
-def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
+def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
                          reorder_actions: List[ReorderAction], max_demand: int, node_infos: List[NodeInfo]):
 
     config = AttentionPPOConfig(
@@ -173,7 +205,7 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, max_steps: 
         d_model=64,
         nhead=4,
         num_layers=2,
-        max_steps_per_episode=number_iterations,
+        max_steps_per_episode=max_steps,
         seed=123,
         log_every=10,
         ppo_epochs=4,
@@ -182,7 +214,7 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, max_steps: 
     )
 
     
-    def _make_step_env(mdp: SupplyChainMDP, reorder_actions: list[ReorderAction], max_demand: int):
+    def _make_step(mdp: SupplyChainMDP, reorder_actions: list[ReorderAction], max_demand: int):
 
         def step_env(state, action_key: int, rng):
 
@@ -211,7 +243,7 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, max_steps: 
             if next_state.category == StateCategory.AWAIT_EVENT:
                 mdp.modify_state_with_event(next_state, ctx)
 
-            # Not infinite horizon, done when we reach the final state
+            # Not infinite horizon, done when we reach the final state (in other file I have max time steps)
             done = next_state.category == StateCategory.FINAL
             return next_state, float(ctx.cumulative_cost), done
 
@@ -221,7 +253,7 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, max_steps: 
 
         return SupplyChainState(
             node_infos=copy.deepcopy(node_infos),
-            remaining_time=1000,
+            remaining_time=max_steps,
             day=0,
             category=StateCategory.AWAIT_ACTION,
             current_node_index=0,
@@ -234,7 +266,7 @@ def train_attention_PPO(mdp: SupplyChainMDP, number_iterations: int, max_steps: 
     
     print("\n---Training with Transformer Cross-Attention PPO ---")
 
-    step_env = _make_step_env(mdp, reorder_actions, max_demand)
+    step_env = _make_step(mdp, reorder_actions, max_demand)
 
     policy, seq_builder, _ = train_attention_ppo(
         make_state=make_state,

@@ -38,15 +38,6 @@ class ReorderAction:
 class GraphAction(Action):
     order_quantity: int
 
-
-@dataclass(slots=True)
-class SCGlobalState:
-    node_features: torch.Tensor  # [node_features, current_node_index, category] becasue The dynaplex sequence builder needs fixed-size fields it can inspect statically
-    current_node_index: float
-    remaining_time: float
-    category: StateCategory
-
-
 class PolicyType(Enum):
     BASE_STOCK = auto()
     FIXED_ORDER = auto()
