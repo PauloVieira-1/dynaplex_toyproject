@@ -14,14 +14,14 @@ try:
         train_attention_ppo,
         select_action_attention,
     )
-    USE_DYNAPLEX_ADAPTER = True
+    USE_DYNAPLEX_ADAPTER = False # use false 
 except Exception:
     from dynaplex_playgroud.algorithms.ppo_attention import (
         AttentionPPOConfig,
         train_attention_ppo,
         select_action_attention,
     )
-    USE_DYNAPLEX_ADAPTER = False
+    USE_DYNAPLEX_ADAPTER = True
 
 
 # ----------------------------------------

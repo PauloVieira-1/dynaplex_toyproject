@@ -36,7 +36,7 @@ class ReorderAction:
 
 @dataclass
 class GraphAction(Action):
-    order_quantity: int
+    order_quantity: int 
 
 class PolicyType(Enum):
     BASE_STOCK = auto()

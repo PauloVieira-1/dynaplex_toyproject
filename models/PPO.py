@@ -7,7 +7,7 @@ def train_PPO(mdp, load_policy=False, total_timesteps=500000):
             seed=42,
             device="cpu",
             hidden_sizes=[256, 256, 128], 
-            num_steps=2048,         
+            num_steps=2048,          
             minibatch_size=512,    
             lr=3e-4,                
             anneal_lr=True, 
