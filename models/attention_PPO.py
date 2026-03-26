@@ -136,20 +136,24 @@ def evaluate_policy_multinode(
         )
 
         total_cost = 0.0
-        steps_taken = 0
+        decision_steps = 0
 
-        while state.category != StateCategory.FINAL and steps_taken < num_steps:
+        # We loop until the MDP signals completion or we hit the day limit
+        while state.category != StateCategory.FINAL and decision_steps < num_steps:
             act = action_selector(state)
             ctx = TrajectoryContext(rng=rng, cumulative_cost=0.0, time_elapsed=0)
+            
             mdp.modify_state_with_action(state, ctx, act)
+            
             if state.category == StateCategory.AWAIT_EVENT:
                 mdp.modify_state_with_event(state, ctx)
-            total_cost += ctx.cumulative_cost
-            steps_taken += sum(len(node.pipeline) for node in state.node_infos)
-
             
+            total_cost += ctx.cumulative_cost
+            
+            decision_steps += 1
+
         costs.append(total_cost)
-        steps_list.append(steps_taken)
+        steps_list.append(decision_steps)
 
     avg_cost = np.mean(costs)
     min_cost = np.min(costs)
@@ -159,7 +163,7 @@ def evaluate_policy_multinode(
     print(f"{name:30s} avg_cost={avg_cost:7.2f}  min={min_cost:.2f}  max={max_cost:.2f}  "
           f"avg_steps={avg_steps:.2f} ({num_seeds} seeds)")
     
-    return avg_steps
+    return avg_cost, avg_steps
 
 # ----------------------------------------
 def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
@@ -228,6 +232,7 @@ def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
     start_time = time.time()
 
     step_env = _make_step(mdp, reorder_actions, max_demand)
+    
     policy, seq_builder, _ = train_attention_ppo(
         make_state=make_state,
         make_action_set=make_action_set,
@@ -249,6 +254,8 @@ def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
             make_action_set=make_action_set,
             action_to_key=_action_to_key,
         )
-
-    aveg_steps = evaluate_policy_multinode("Attention PPO", mdp, learned_selector, node_infos, max_steps)
-    return learned_selector, aveg_steps, time_to_train
+    
+    total_training_samples = config.num_episodes * config.max_steps_per_episode * config.num_envs
+    evaluate_policy_multinode("Attention PPO", mdp, learned_selector, node_infos, max_steps)
+    
+    return learned_selector, total_training_samples, time_to_train
