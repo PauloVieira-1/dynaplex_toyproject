@@ -180,4 +180,4 @@ def get_ppo_training_timesteps():
     return 1_000_000 # environment steps
 
 def get_attention_training_episodes():
-    return 500       # episodes × 16 envs × 500 steps = 4M steps
+    return 50      # episodes × 16 envs × 500 steps = 4M steps
