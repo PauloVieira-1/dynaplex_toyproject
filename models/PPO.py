@@ -112,6 +112,9 @@ class ConvergeTrackingPPOTrainer(PPOTrainer):
                 next_terminated.copy_(torch.from_numpy(env_terminations))
                 next_truncated.copy_(torch.from_numpy(env_truncations))
                 next_action_mask.copy_(torch.from_numpy(infos["action_mask"]))
+
+                self.total_simulation_steps = global_step
+                self.time_taken = time.time() - start_time
             
             # Bootstrap value if not terminated (but do bootstrap if truncated)
             with torch.no_grad():
@@ -340,4 +343,8 @@ def train_PPO(mdp, load_policy=False, total_timesteps=500_000, reward_threshold=
         print("Training completed.")
 
     print(f"Trained policy: {trained_policy}")
+    
+    steps_taken = int(ppo_trainer.total_simulation_steps)
+    time_taken = float(ppo_trainer.time_taken)
+
     return trained_policy, steps_taken, time_taken

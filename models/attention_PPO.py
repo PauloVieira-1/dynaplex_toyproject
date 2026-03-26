@@ -255,7 +255,6 @@ def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
             action_to_key=_action_to_key,
         )
     
-    total_training_samples = config.num_episodes * config.max_steps_per_episode * config.num_envs
-    evaluate_policy_multinode("Attention PPO", mdp, learned_selector, node_infos, max_steps)
-    
-    return learned_selector, total_training_samples, time_to_train
+    avg_cost, _ = evaluate_policy_multinode("Attention PPO", mdp, learned_selector, node_infos, max_steps)
+    total_training_samples = config.num_episodes * config.max_steps_per_episode
+    return learned_selector, total_training_samples, time_to_train, avg_cost

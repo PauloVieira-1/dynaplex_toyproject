@@ -168,7 +168,7 @@ def main() -> None:
 
     max_demand = 6
 
-    trained_policy, steps_to_train_attention, time_to_train_attention = train_attention(
+    trained_policy_att, steps_to_train_att, time_to_train_att, avg_cost_att = train_attention(
         mdp,
         number_iterations=get_attention_training_episodes(),
         max_steps=get_max_simulation_iterations(),
@@ -179,8 +179,8 @@ def main() -> None:
         ).node_infos]
     )
 
-    print(f"Time taken to train Attention: {time_to_train_attention}")
-    print(f"Steps taken to train Attention: {steps_to_train_attention}")
+    print(f"Time taken to train Attention: {time_to_train_att}")
+    print(f"Steps taken to train Attention: {steps_to_train_att}")
 
     print("Simulating episode with trained Attention policy...")
 
@@ -198,7 +198,7 @@ def main() -> None:
 
     simulate_episode(
         mdp,
-        trained_policy,
+        trained_policy_att,
         seed=50,
         name="Attention", 
         recorder=recorder,
@@ -220,19 +220,17 @@ def main() -> None:
     )
 
     plot_training_comparison(
-        csv_files={
-            "Random":     "results/random.csv",
-            "Base Stock": "results/base_stock.csv",
-            "PPO":        "results/PPO_trained.csv",
-            "Attention":  "results/attention_trained.csv",
-        },
-        training_stats={
-            "PPO":       (steps_to_train_ppo, time_to_train_ppo),
-            "Attention": (steps_to_train_attention, time_to_train_attention),
-        },
-        save_dir="results/",
-    )
-
+            csv_files={
+                "Random":     "results/random.csv",
+                "PPO":        "results/PPO_trained.csv",
+                "Attention":  "results/attention_trained.csv",
+            },
+            training_stats={
+                "PPO":       (steps_to_train_ppo, time_to_train_ppo),
+                "Attention": (steps_to_train_att, time_to_train_att),
+            },
+            save_dir="results/",
+        )
 
 
 if __name__ == "__main__":
