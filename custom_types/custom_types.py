@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import List
 from dynaplex.modelling import StateCategory
 from dynaplex_playgroud.data.action_base import Action
-import torch
 
 
 @dataclass(slots=True)

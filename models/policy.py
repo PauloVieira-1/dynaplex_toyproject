@@ -75,7 +75,7 @@ class MinMaxPolicy(BasePolicy):
 class FixedOrderPolicy(BasePolicy):
 
     order_quantity: int = 30
-    price_per_unit: float = 20.0 # Should be sey by noode (change later)
+    price_per_unit: float = 20.0 # Should be sey by node (change later)
 
     def get_action(self, node_info) -> int:
         available_capacity = self.node.capacity - max(0, node_info.inventory_level)
