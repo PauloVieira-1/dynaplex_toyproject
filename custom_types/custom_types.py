@@ -8,7 +8,7 @@ import torch
 
 @dataclass(slots=True)
 class NodeInfo:
-    inventory_level: int  # positive = inventory, negative = backlog
+    inventory_level: int 
     pipeline: List[int] # Units that have already been shipped and are physically traveling toward the node
 
 

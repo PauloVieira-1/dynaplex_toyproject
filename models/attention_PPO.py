@@ -58,28 +58,28 @@ class SupplyChainState:
     pending_orders: List[int]
 
 # ----------------------------------------
-def _node_to_feature(node_static, node_dynamic, pending: float) -> NodeFeature: 
-    """
-    Convert a single node's static + dynamic info into a NodeFeature.
-    """
-    inventory = max(0, node_dynamic.inventory_level) / node_static.capacity
-    backlog = max(0, -node_dynamic.inventory_level) / node_static.capacity
+# def _node_to_feature(node_static, node_dynamic, pending: float) -> NodeFeature: 
+#     """
+#     Convert a single node's static + dynamic info into a NodeFeature.
+#     """
+#     inventory = max(0, node_dynamic.inventory_level) / node_static.capacity
+#     backlog = max(0, -node_dynamic.inventory_level) / node_static.capacity
 
-    pipeline_slots = []
-    for s in range(MAX_PIPELINE_LENGTH):
-        val = node_dynamic.pipeline[s] if s < len(node_dynamic.pipeline) else 0
-        pipeline_slots.append(val / node_static.capacity)
+#     pipeline_slots = []
+#     for s in range(MAX_PIPELINE_LENGTH):
+#         val = node_dynamic.pipeline[s] if s < len(node_dynamic.pipeline) else 0
+#         pipeline_slots.append(val / node_static.capacity)
 
-    return NodeFeature(
-        inventory=inventory,
-        backlog=backlog,
-        pending=pending / node_static.capacity,
-        pl_0=pipeline_slots[0],
-        pl_1=pipeline_slots[1],
-        pl_2=pipeline_slots[2],
-        pl_3=pipeline_slots[3],
-        pl_4=pipeline_slots[4],
-    )
+#     return NodeFeature(
+#         inventory=inventory,
+#         backlog=backlog,
+#         pending=pending / node_static.capacity,
+#         pl_0=pipeline_slots[0],
+#         pl_1=pipeline_slots[1],
+#         pl_2=pipeline_slots[2],
+#         pl_3=pipeline_slots[3],
+#         pl_4=pipeline_slots[4],
+#     )
 
 # ----------------------------------------
 def build_action_set(state: SupplyChainState, mdp: SupplyChainMDP) -> ActionSet:
@@ -232,8 +232,9 @@ def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
     start_time = time.time()
 
     step_env = _make_step(mdp, reorder_actions, max_demand)
-    
-    policy, seq_builder, _ = train_attention_ppo(
+
+    # Capture episode_rewards instead of discarding with _
+    policy, seq_builder, episode_rewards = train_attention_ppo(
         make_state=make_state,
         make_action_set=make_action_set,
         step_env=step_env,
@@ -256,5 +257,7 @@ def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
         )
     
     avg_cost, _ = evaluate_policy_multinode("Attention PPO", mdp, learned_selector, node_infos, max_steps)
-    total_training_samples = config.num_episodes * config.max_steps_per_episode
-    return learned_selector, total_training_samples, time_to_train, avg_cost
+    total_training_samples = config.num_episodes * config.max_steps_per_episode * config.num_envs
+    episode_costs = [-r for r in episode_rewards] if episode_rewards else [avg_cost]
+
+    return learned_selector, total_training_samples, time_to_train, avg_cost, episode_costs

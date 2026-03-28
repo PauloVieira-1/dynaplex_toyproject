@@ -1,20 +1,14 @@
 from __future__ import annotations
-from typing import List
 from custom_types import SupplyChainState
-from custom_types.custom_types import ReorderAction
-import copy
 import numpy as np
 from dynaplex.modelling import StateCategory, TrajectoryContext
-from models.attention_PPO import train_attention
-from models.PPO import train_PPO
 from evaluation.record import EpisodeRecorder
 from evaluation.plots import plot_results
-from evaluation.plot_conversion import plot_training_comparison
 from helper_functions import *
 from assembly_tree import AssemblyTree
 from mdp_assembly import SupplyChainMDP
-from helper_functions import get_max_simulation_iterations, get_attention_training_episodes, get_ppo_training_timesteps
-
+from config.hyperparameters_config import get_max_simulation_iterations, get_attention_training_episodes, get_ppo_training_timesteps
+from evaluation.run_experiment import run_experiment_with_csv_cache
 
 # Simulation
 # ------------
@@ -109,102 +103,102 @@ def main() -> None:
     # Run simulation with random orders 
     # ------------------------------------------------
 
-    tree = AssemblyTree("config/chain_2.json")
-    tree.create_tree_from_json()
+    # tree = AssemblyTree("config/chain_2.json")
+    # tree.create_tree_from_json()
     
-    policy_list = tree.get_policy_list()
-    node_list = tree.get_assembly_tree()
+    # # policy_list = tree.get_policy_list()
+    # node_list = tree.get_assembly_tree()
 
-    mdp = SupplyChainMDP(
-        nodes = node_list,
-        initial_horizon=get_max_simulation_iterations(),
-    )
+    # mdp_2 = SupplyChainMDP(
+    #     nodes = node_list,
+    #     initial_horizon=get_max_simulation_iterations(),
+    # )
 
-    recorder = EpisodeRecorder("results/random.csv")
-    simulate_episode(mdp, policy_list, seed=50, name="Random", recorder=recorder, max_steps=get_max_simulation_iterations())
+    # recorder = EpisodeRecorder("results/random.csv")
+    # simulate_episode(mdp_2, policy_list, seed=50, name="Random", recorder=recorder, max_steps=get_max_simulation_iterations())
 
 
 
     # Run baseline simulation with the initial policy
     # ------------------------------------------------    
 
-    # tree = AssemblyTree("config/chain_1.json")
-    # tree.create_tree_from_json()
+    tree = AssemblyTree("config/chain_1.json")
+    tree.create_tree_from_json()
     
-    # policy_list_2 = tree.get_policy_list()
-    # node_list_2 = tree.get_assembly_tree()
+    policy_list_2 = tree.get_policy_list()
+    node_list_2 = tree.get_assembly_tree()
 
-    # mdp_2 = SupplyChainMDP(
-    #     nodes = node_list_2,
-    #     initial_horizon=get_max_simulation_iterations(),
-    # )
+    mdp = SupplyChainMDP(
+        nodes = node_list_2,
+        initial_horizon=get_max_simulation_iterations(),
+    )
 
     # recorder = EpisodeRecorder("results/base_stock.csv")
-    # simulate_episode(mdp_2, policy_list_2, seed=50, name="Base Stock", recorder=recorder, max_steps=get_max_simulation_iterations())
+    # simulate_episode(mdp, policy_list_2, seed=50, name="Base Stock", recorder=recorder, max_steps=get_max_simulation_iterations())
 
 
     # Run simulation with the trained PPO policy
     # ------------------------------------------------
 
-    number_iterations = get_ppo_training_timesteps()
-    trained_policy, steps_to_train_ppo, time_to_train_ppo = train_PPO(mdp, load_policy=False, total_timesteps=number_iterations)
+    # number_iterations = get_ppo_training_timesteps()
+    # trained_policy, steps_to_train_ppo, time_to_train_ppo = train_PPO(mdp, load_policy=False, total_timesteps=number_iterations)
 
-    print(f"Time taken to train PPO: {time_to_train_ppo}")
-    print(f"Steps taken to train PPO: {steps_to_train_ppo}")
+    # print(f"Time taken to train PPO: {time_to_train_ppo}")
+    # print(f"Steps taken to train PPO: {steps_to_train_ppo}")
 
-    print("Simulating episode with trained PPO policy...")
+    # print("Simulating episode with trained PPO policy...")
 
-    recorder = EpisodeRecorder("results/PPO_trained.csv")
-    simulate_episode(mdp, trained_policy, seed=50, name="PPO", recorder=recorder, max_steps=get_max_simulation_iterations())
+    # recorder = EpisodeRecorder("results/PPO_trained.csv")
+    # simulate_episode(mdp, trained_policy, seed=50, name="PPO", recorder=recorder, max_steps=get_max_simulation_iterations())
 
 
     # Run simulation with trained Attention policy
     # ------------------------------------------------
 
-    reorder_actions = [
-        ReorderAction(order_quantity=q)
-        for q in range(mdp.num_actions) 
-    ]
+    # reorder_actions = [
+    #     ReorderAction(order_quantity=q)
+    #     for q in range(mdp.num_actions) 
+    # ]
 
-    max_demand = 6
+    # max_demand = 6
 
-    trained_policy_att, steps_to_train_att, time_to_train_att, avg_cost_att = train_attention(
-        mdp,
-        number_iterations=get_attention_training_episodes(),
-        max_steps=get_max_simulation_iterations(),
-        reorder_actions=reorder_actions,
-        max_demand=max_demand, 
-        node_infos=[copy.deepcopy(node_info) for node_info in mdp.get_initial_state(
-            TrajectoryContext(rng=np.random.default_rng(50))
-        ).node_infos]
-    )
+    # trained_policy_att, steps_to_train_att, time_to_train_att, avg_cost_att = train_attention(
+    #     mdp,
+    #     number_iterations=get_attention_training_episodes(),
+    #     max_steps=get_max_simulation_iterations(),
+    #     reorder_actions=reorder_actions,
+    #     max_demand=max_demand, 
+    #     node_infos=[copy.deepcopy(node_info) for node_info in mdp.get_initial_state(
+    #         TrajectoryContext(rng=np.random.default_rng(50))
+    #     ).node_infos]
+    # )
 
-    print(f"Time taken to train Attention: {time_to_train_att}")
-    print(f"Steps taken to train Attention: {steps_to_train_att}")
+    # print(f"Time taken to train Attention: {time_to_train_att}")
+    # print(f"Steps taken to train Attention: {steps_to_train_att}")
 
-    print("Simulating episode with trained Attention policy...")
+    # print("Simulating episode with trained Attention policy...")
 
-    recorder = EpisodeRecorder("results/attention_trained.csv")
-    initial_ctx = TrajectoryContext(rng=np.random.default_rng(50))
+    # recorder = EpisodeRecorder("results/attention_trained.csv")
+    # initial_ctx = TrajectoryContext(rng=np.random.default_rng(50))
 
-    initial_state = SupplyChainState(
-        node_infos=[copy.deepcopy(n) for n in mdp.get_initial_state(initial_ctx).node_infos],
-        remaining_time=get_max_simulation_iterations(),
-        day=0,
-        category=StateCategory.AWAIT_ACTION,
-        current_node_index=0,
-        pending_orders=[0 for _ in mdp.nodes],
-    )
+    # initial_state = SupplyChainState(
+    #     node_infos=[copy.deepcopy(n) for n in mdp.get_initial_state(initial_ctx).node_infos],
+    #     remaining_time=get_max_simulation_iterations(),
+    #     day=0,
+    #     category=StateCategory.AWAIT_ACTION,
+    #     current_node_index=0,
+    #     pending_orders=[0 for _ in mdp.nodes],
+    # )
 
-    simulate_episode(
-        mdp,
-        trained_policy_att,
-        seed=50,
-        name="Attention", 
-        recorder=recorder,
-        initial_state=initial_state,
-        max_steps=get_max_simulation_iterations()
-    )
+    # simulate_episode(
+    #     mdp,
+    #     trained_policy_att,
+    #     seed=50,
+    #     name="Attention", 
+    #     recorder=recorder,
+    #     initial_state=initial_state,
+    #     max_steps=get_max_simulation_iterations()
+    # )
 
 
     # Generate plots of results
@@ -219,18 +213,11 @@ def main() -> None:
         }
     )
 
-    plot_training_comparison(
-            csv_files={
-                "Random":     "results/random.csv",
-                "PPO":        "results/PPO_trained.csv",
-                "Attention":  "results/attention_trained.csv",
-            },
-            training_stats={
-                "PPO":       (steps_to_train_ppo, time_to_train_ppo),
-                "Attention": (steps_to_train_att, time_to_train_att),
-            },
-            save_dir="results/",
-        )
+
+    # TEST AREA 
+    # ------------------------------------------------
+
+    run_experiment_with_csv_cache(mdp)
 
 
 if __name__ == "__main__":

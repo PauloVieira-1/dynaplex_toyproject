@@ -172,12 +172,3 @@ def modify_state_category(state: SupplyChainState, nodes: List[Node]) -> None:
 
     else:
         state.category = StateCategory.AWAIT_EVENT
-
-def get_max_simulation_iterations():
-    return 700
-
-def get_ppo_training_timesteps():
-    return 1_000_000 # environment steps
-
-def get_attention_training_episodes():
-    return 50      # episodes × 16 envs × 500 steps = 4M steps
