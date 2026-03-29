@@ -204,14 +204,14 @@ def main() -> None:
     # Generate plots of results
     # ------------------------------------------------
 
-    plot_results(
-        {
-            "Random": "results/random.csv",
-            "Base Stock": "results/base_stock.csv",
-            "PPO": "results/PPO_trained.csv",
-            "Attention": "results/attention_trained.csv",
-        }
-    )
+    # plot_results(
+    #     {
+    #         "Random": "results/random.csv",
+    #         "Base Stock": "results/base_stock.csv",
+    #         "PPO": "results/PPO_trained.csv",
+    #         "Attention": "results/attention_trained.csv",
+    #     }
+    # )
 
 
     # TEST AREA 
