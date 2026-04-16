@@ -1,5 +1,5 @@
 from __future__ import annotations
-from custom_types import SupplyChainState
+from custom_types.custom_types import SupplyChainState, ReorderAction
 import numpy as np
 from dynaplex.modelling import StateCategory, TrajectoryContext
 from evaluation.record import EpisodeRecorder
@@ -9,6 +9,10 @@ from assembly_tree import AssemblyTree
 from mdp_assembly import SupplyChainMDP
 from config.hyperparameters_config import get_max_simulation_iterations, get_attention_training_episodes, get_ppo_training_timesteps
 from evaluation.run_experiment import run_experiment_with_csv_cache
+from models.PPO import train_PPO
+from models.attention_PPO import train_attention
+import copy 
+
 
 # Simulation
 # ------------
@@ -140,65 +144,64 @@ def main() -> None:
     # Run simulation with the trained PPO policy
     # ------------------------------------------------
 
-    # number_iterations = get_ppo_training_timesteps()
-    # trained_policy, steps_to_train_ppo, time_to_train_ppo = train_PPO(mdp, load_policy=False, total_timesteps=number_iterations)
+    number_iterations = get_ppo_training_timesteps()
+    trained_policy, steps_to_train_ppo, time_to_train_ppo = train_PPO(mdp, load_policy=False, total_timesteps=number_iterations)
 
-    # print(f"Time taken to train PPO: {time_to_train_ppo}")
-    # print(f"Steps taken to train PPO: {steps_to_train_ppo}")
+    print(f"Time taken to train PPO: {time_to_train_ppo}")
+    print(f"Steps taken to train PPO: {steps_to_train_ppo}")
 
-    # print("Simulating episode with trained PPO policy...")
+    print("Simulating episode with trained PPO policy...")
 
-    # recorder = EpisodeRecorder("results/PPO_trained.csv")
-    # simulate_episode(mdp, trained_policy, seed=50, name="PPO", recorder=recorder, max_steps=get_max_simulation_iterations())
+    recorder = EpisodeRecorder("results/PPO_trained.csv")
+    simulate_episode(mdp, trained_policy, seed=50, name="PPO", recorder=recorder, max_steps=get_max_simulation_iterations())
 
 
     # Run simulation with trained Attention policy
     # ------------------------------------------------
 
-    # reorder_actions = [
-    #     ReorderAction(order_quantity=q)
-    #     for q in range(mdp.num_actions) 
-    # ]
+    reorder_actions = [
+        ReorderAction(order_quantity=q)
+        for q in range(mdp.num_actions) 
+    ]
 
-    # max_demand = 6
+    max_demand = 6
 
-    # trained_policy_att, steps_to_train_att, time_to_train_att, avg_cost_att = train_attention(
-    #     mdp,
-    #     number_iterations=get_attention_training_episodes(),
-    #     max_steps=get_max_simulation_iterations(),
-    #     reorder_actions=reorder_actions,
-    #     max_demand=max_demand, 
-    #     node_infos=[copy.deepcopy(node_info) for node_info in mdp.get_initial_state(
-    #         TrajectoryContext(rng=np.random.default_rng(50))
-    #     ).node_infos]
-    # )
+    trained_policy_att, steps_to_train_att, time_to_train_att, avg_cost_att, episode_costs = train_attention(
+        mdp,
+        number_iterations=get_attention_training_episodes(),
+        max_steps=get_max_simulation_iterations(),
+        reorder_actions=reorder_actions,
+        max_demand=max_demand, 
+        node_infos=[copy.deepcopy(node_info) for node_info in mdp.get_initial_state(
+            TrajectoryContext(rng=np.random.default_rng(50))
+        ).node_infos]
+    )
 
-    # print(f"Time taken to train Attention: {time_to_train_att}")
-    # print(f"Steps taken to train Attention: {steps_to_train_att}")
+    print(f"Time taken to train Attention: {time_to_train_att}")
+    print(f"Steps taken to train Attention: {steps_to_train_att}")
+    print(f"Average cost Attention: {avg_cost_att}")
 
-    # print("Simulating episode with trained Attention policy...")
+    recorder = EpisodeRecorder("results/attention_trained.csv")
+    initial_ctx = TrajectoryContext(rng=np.random.default_rng(50))
 
-    # recorder = EpisodeRecorder("results/attention_trained.csv")
-    # initial_ctx = TrajectoryContext(rng=np.random.default_rng(50))
+    initial_state = SupplyChainState(
+        node_infos=[copy.deepcopy(n) for n in mdp.get_initial_state(initial_ctx).node_infos],
+        remaining_time=get_max_simulation_iterations(),
+        day=0,
+        category=StateCategory.AWAIT_ACTION,
+        current_node_index=0,
+        pending_orders=[0 for _ in mdp.nodes],
+    )
 
-    # initial_state = SupplyChainState(
-    #     node_infos=[copy.deepcopy(n) for n in mdp.get_initial_state(initial_ctx).node_infos],
-    #     remaining_time=get_max_simulation_iterations(),
-    #     day=0,
-    #     category=StateCategory.AWAIT_ACTION,
-    #     current_node_index=0,
-    #     pending_orders=[0 for _ in mdp.nodes],
-    # )
-
-    # simulate_episode(
-    #     mdp,
-    #     trained_policy_att,
-    #     seed=50,
-    #     name="Attention", 
-    #     recorder=recorder,
-    #     initial_state=initial_state,
-    #     max_steps=get_max_simulation_iterations()
-    # )
+    simulate_episode(
+        mdp,
+        trained_policy_att,
+        seed=50,
+        name="Attention", 
+        recorder=recorder,
+        initial_state=initial_state,
+        max_steps=get_max_simulation_iterations()
+    )
 
 
     # Generate plots of results
@@ -214,11 +217,11 @@ def main() -> None:
     # )
 
 
-    # TEST AREA 
+    # TEST ARAND BETTER PLOT GENERATION 
     # ------------------------------------------------
 
-    run_experiment_with_csv_cache(mdp)
-
+    # run_experiment_with_csv_cache(mdp, rerun_experiment=True)
+# 
 
 if __name__ == "__main__":
     main()

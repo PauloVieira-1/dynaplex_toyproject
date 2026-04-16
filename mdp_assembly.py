@@ -76,9 +76,6 @@ class SupplyChainMDP:
 
 
     def modify_state_with_event(self, state: SupplyChainState, context: TrajectoryContext) -> None:
-        """
-        This is a function that modifies the state of the supply chain based on the current event, which is the arrival of an order.
-        """
 
         # I decided to abstract each "step" into a functions in helper_functions.py because modify_state_with_event grew far too big 
         # I will possibly be doing the same for modify_state_with_action
@@ -106,28 +103,8 @@ class SupplyChainMDP:
 
     def modify_state_with_action(self, state: SupplyChainState, context: TrajectoryContext, action: int) -> None:
         
-        
-        # ---------------------------------------------------------------------------------------------------
-
-        # Before, I encoded the single integer action into a list of order quantities for each node. 
-        # Now, since we consdier the system sequentially and each node makes its decision one at a time, 
-        # we can directly use the action as the order quantity for the current node without encoding/decoding.
-
-            # action_list = decode_action(action, self.action_dims)
-
-        # ---------------------------------------------------------------------------------------------------
-        
-            # Validates the action, then adds the order quantity either into
-            # pending_orders (if the node has upstream suppliers) or directly into the pipeline
-            # or inventory (if it is a source node with infinite supply).
-
 
         process_node_order(state, self.nodes, action, context)
-
-
-        # This function is abstracted out of modify_state_with_action
-        # It sets the state category to either AWAIT_EVENT or AWAIT_ACTION depending on if all nodes have been processed 
-
 
         modify_state_category(state, self.nodes)
             
@@ -152,28 +129,6 @@ class SupplyChainMDP:
 
         features.append(state.current_node_index / len(self.nodes))
         features.append(state.remaining_time / self.initial_horizon)
-
-
-
-    # OPTION 2 - features for each node
-    # -----------------------------------------------
-
-    # def write_features(self, state: SupplyChainState, features: Features) -> None:
-            
-    #     index_node = state.current_node_index
-    #     node_static = self.nodes[index_node]
-    #     node_dynamic = state.node_infos[index_node]
-
-    #     inventory = max(0, node_dynamic.inventory_level)
-    #     backlog = max(0, -node_dynamic.inventory_level)
-        
-    #     features.append(inventory / node_static.capacity)
-    #     features.append(backlog / node_static.capacity)
-    #     features.append(sum(node_dynamic.pipeline) / node_static.capacity)
-
-    #     features.append(index_node / len(self.nodes))
-    #     features.append(state.remaining_time / self.initial_horizon)
-
 
 
     def write_action_validity(self, state: SupplyChainState, valid: NDArray[np.bool_]) -> None:

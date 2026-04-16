@@ -9,7 +9,7 @@ import torch.nn as nn
 class ConvergeTrackingPPOTrainer(PPOTrainer):
     def __init__(self, *args, reward_threshold=200, eval_interval=10, eval_window=5, **kwargs):
         super().__init__(*args, **kwargs)
-        self.total_simulation_steps = 0  # counts real env transitions
+        self.total_simulation_steps = 0  # counts env transitions
         self.time_taken = 0
 
     def add_simulation_steps(self, steps: int = 1):

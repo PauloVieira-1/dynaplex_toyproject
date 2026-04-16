@@ -233,7 +233,6 @@ def train_attention(mdp: SupplyChainMDP, number_iterations: int, max_steps: int,
 
     step_env = _make_step(mdp, reorder_actions, max_demand)
 
-    # Capture episode_rewards instead of discarding with _
     policy, seq_builder, episode_rewards = train_attention_ppo(
         make_state=make_state,
         make_action_set=make_action_set,
